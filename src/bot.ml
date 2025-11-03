@@ -6,9 +6,8 @@ open Bot_components
 open Botlib
 open Actions
 open Github_installations
-open Helpers
-open String_utils
 open Utils
+open String_utils
 
 let toml_data = Config.toml_of_file (Sys.get_argv ()).(1)
 

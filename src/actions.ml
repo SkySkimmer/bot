@@ -6,7 +6,6 @@ open Bot_components.GitLab_types
 open Cohttp
 open Cohttp_lwt_unix
 open Git_utils
-open Helpers
 open Utils
 open Lwt.Infix
 open Lwt.Syntax
