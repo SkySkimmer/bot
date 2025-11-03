@@ -6,6 +6,7 @@ open Bot_components
 open Botlib
 open Actions
 open Github_installations
+open String_utils
 open Utils
 open String_utils
 
