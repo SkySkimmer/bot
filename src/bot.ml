@@ -6,6 +6,7 @@ open Bot_components
 open Botlib
 open Actions
 open Github_installations
+open String_utils
 open Utils
 
 let toml_data = Config.toml_of_file (Sys.get_argv ()).(1)
@@ -75,7 +76,7 @@ let callback _conn req body =
     in
     let coqbot_minimize_text_of_body body =
       if
-        string_match
+        String_utils.string_match
           ~regexp:
             ( f
                 "@%s:? [Mm]inimize\\([^`]*\\)```\\([^\n\

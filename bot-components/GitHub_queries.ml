@@ -16,7 +16,7 @@ let extract_backport_info ~(bot_info : Bot_info.t) description :
   let backport_info_unit = main_regexp ^ "; \\(.*\\)$" in
   let end_regexp = main_regexp in
   let rec aux description =
-    if string_match ~regexp:backport_info_unit description then
+    if String_utils.string_match ~regexp:backport_info_unit description then
       let backport_to = Str.matched_group 1 description in
       let rejected_milestone =
         Str.matched_group 2 description |> Int.of_string
@@ -24,7 +24,7 @@ let extract_backport_info ~(bot_info : Bot_info.t) description :
       Str.matched_group 3 description
       |> aux
       |> List.cons {backport_to; rejected_milestone}
-    else if string_match ~regexp:end_regexp description then
+    else if String_utils.string_match ~regexp:end_regexp description then
       let backport_to = Str.matched_group 1 description in
       let rejected_milestone =
         Str.matched_group 2 description |> Int.of_string
@@ -32,7 +32,7 @@ let extract_backport_info ~(bot_info : Bot_info.t) description :
       [{backport_to; rejected_milestone}]
     else []
   in
-  if string_match ~regexp:begin_regexp description then
+  if String_utils.string_match ~regexp:begin_regexp description then
     Str.matched_group 1 description |> aux
   else []
 
