@@ -2,7 +2,7 @@
  (name Bot_components)
  (public_name bot-components)
  (libraries base camlzip cohttp-lwt-unix eqaf ohex mirage-crypto stdio str
-   x509 yojson ISO8601 digestif)
+   x509 yojson ISO8601 digestif toml)
  (private_modules GraphQL_query GitHub_GraphQL Utils)
  (modules_without_implementation GitHub_types GitLab_types)
  (preprocess
@@ -10,7 +10,9 @@
    ((pps graphql_ppx -- -native -schema bot-components/github-schema.json)
     GitHub_GraphQL)
    ((pps graphql_ppx -- -native -schema bot-components/gitlab-schema.json)
-    GitLab_GraphQL)))
+    GitLab_GraphQL)
+   ((pps ppx_expect)
+    Git_utils)))
  (preprocessor_deps
   (file github-schema.json)
   (file gitlab-schema.json)))
