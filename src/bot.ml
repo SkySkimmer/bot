@@ -56,7 +56,7 @@ let callback _conn req body =
       |> List.hd |> Option.value ~default:""
     in
     let extract_minimize_script quote_kind body =
-      MinimizeScript
+      CI_utils.MinimizeScript
         { quote_kind= quote_kind |> Str.global_replace (Str.regexp "[ \r]") ""
         ; body= body |> extract_minimize_file }
     in
@@ -64,7 +64,7 @@ let callback _conn req body =
       url |> Str.global_replace (Str.regexp "^[` ]+\\|[` ]+$") ""
     in
     let extract_minimize_attachment ?(description = "") url =
-      MinimizeAttachment {description; url= url |> extract_minimize_url}
+      CI_utils.MinimizeAttachment {description; url= url |> extract_minimize_url}
     in
     let parse_minimiation_requests requests =
       requests
