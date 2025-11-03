@@ -3,19 +3,13 @@ open Bot_components
 open Bot_components.Bot_info
 open Bot_components.GitHub_types
 open Bot_components.GitLab_types
+open Bot_components.CI_utils
 open Cohttp
 open Cohttp_lwt_unix
 open Git_utils
 open Utils
 open Lwt.Infix
 open Lwt.Syntax
-
-type rocq_job_info =
-  { docker_image: string
-  ; dependencies: string list
-  ; targets: string list
-  ; compiler: string
-  ; opam_variant: string }
 
 let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
@@ -274,16 +268,6 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
   | _ ->
       Lwt.return_unit
 
-module BenchResults = struct
-  type t =
-    { summary_table: string
-    ; failures: string
-    ; slow_table: string
-    ; slow_number: int
-    ; fast_table: string
-    ; fast_number: int }
-end
-
 let fetch_bench_results ~job_info () =
   let open BenchResults in
   let open Lwt.Syntax in
@@ -503,8 +487,6 @@ let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
               Lwt_io.printlf "Bench job has been created, ignoring info update."
           | _ ->
               Lwt_io.printlf "Unknown state for bench job: %s" state ) )
-
-type build_failure = Warn of string | Retry of string | Ignore of string
 
 let trace_action ~repo_full_name trace =
   trace |> String.length
@@ -742,22 +724,9 @@ let create_pipeline_summary ?summary_top pipeline_info pipeline_url =
   |> (match summary_top with Some text -> List.cons text | None -> Fn.id)
   |> String.concat ~sep:"\n\n"
 
-type ci_minimization_info =
-  { target: string
-  ; full_target: string
-  ; ci_targets: string list
-  ; docker_image: string
-  ; opam_switch: string
-  ; failing_urls: string
-  ; passing_urls: string }
-
 type coqbot_minimize_script_data =
   | MinimizeScript of {quote_kind: string; body: string}
   | MinimizeAttachment of {description: string; url: string}
-
-type artifact_info =
-  | ArtifactInfo of
-      {artifact_owner: string; artifact_repo: string; artifact_id: string}
 
 let parse_github_artifact_url url =
   let github_prefix = "https://github.com/" in
@@ -772,16 +741,6 @@ let parse_github_artifact_url url =
          ; artifact_repo= Str.matched_group 2 url
          ; artifact_id= Str.matched_group 4 url } )
   else None
-
-type artifact_error =
-  | ArtifactEmpty
-  | ArtifactContainsMultipleFiles of string list
-  | ArtifactDownloadError of string
-
-type run_ci_minimization_error =
-  | ArtifactError of
-      {url: string; artifact: artifact_info; artifact_error: artifact_error}
-  | DownloadError of {url: string; error: string}
 
 let run_ci_minimization_error_to_string = function
   | ArtifactError
@@ -890,15 +849,6 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
        | target, Error f ->
            Either.Second (target, f) )
   |> Lwt.return_ok
-
-type ci_minimization_job_suggestion_info =
-  { base_job_failed: bool
-  ; base_job_errored: string option
-  ; head_job_succeeded: bool
-  ; missing_error: bool
-  ; non_v_file: string option
-  ; job_kind: string
-  ; job_target: string (*; overlayed: bool*) }
 
 let ci_minimization_extract_job_specific_info ~head_pipeline_summary
     ~base_pipeline_summary ~base_checks_errors ~base_checks = function
@@ -1018,18 +968,6 @@ let ci_minimization_extract_job_specific_info ~head_pipeline_summary
       Error (f "Could not find summary for job %s." name)
   | {name; text= None}, _ ->
       Error (f "Could not find text for job %s." name)
-
-type ci_minimization_pr_info =
-  { comment_thread_id: GitHub_ID.t
-  ; base: string
-  ; head: string
-  ; pr_number: int
-  ; draft: bool
-  ; body: string
-  ; labels: string list
-  ; base_pipeline_finished: bool
-  ; head_pipeline_finished: bool
-  ; failed_test_suite_jobs: string list }
 
 let shorten_ci_check_name target =
   target
@@ -1325,20 +1263,6 @@ let fetch_ci_minimization_info ~bot_info ~owner ~repo ~pr_number
                     |> List.map ~f:(fun ({name}, _) -> name)
                     |> String.concat ~sep:", " ) ) ) )
 
-type ci_minimization_request =
-  | Auto
-  | RequestSuggested
-  | RequestAll
-  | RequestExplicit of string list
-
-type ci_minimization_suggestion_kind =
-  (* this is a job that we suggest minimization for *)
-  | Suggested
-  (* we don't suggest running this job, but it's okay to; give a reason that we don't suggest it *)
-  | Possible of string
-  (* we expect that running this job won't work; give a reason *)
-  | Bad of string
-
 (* For grammatical correctness, all messages are expected to follow "because" *)
 let ci_minimization_suggest ~base
     { base_job_failed
@@ -1372,11 +1296,6 @@ let ci_minimization_suggest ~base
                 minimized at this time (instead, @JasonGross can help diagnose \
                 and fix the issue)" )
         else Suggested
-
-type ci_pr_minimization_suggestion =
-  | Suggest
-  | RunAutomatically
-  | Silent of string
 
 let suggest_ci_minimization_for_pr = function
   (* don't suggest if there are failed test-suite jobs (TODO: decide about async?) *)
