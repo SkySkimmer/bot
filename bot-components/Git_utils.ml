@@ -1,10 +1,9 @@
 open Base
-open Bot_components
-open Bot_components.Bot_info
-open Bot_components.GitHub_types
-open Helpers
+open Bot_info
+open GitHub_types
 open Lwt.Infix
 open Lwt.Syntax
+open Utils
 
 let gitlab_repo ~bot_info ~gitlab_domain ~gitlab_full_name =
   gitlab_token bot_info gitlab_domain
@@ -46,15 +45,15 @@ let gitlab_ref ~bot_info ~(issue : issue) ~github_mapping ~gitlab_mapping =
           | Ok (Some content) ->
               let gl_domain =
                 Option.value
-                  (Config.subkey_value
-                     (Config.toml_of_string content)
+                  (Utils.subkey_value
+                     (Utils.toml_of_string content)
                      "mapping" "gitlab_domain" )
                   ~default:default_gitlab_domain
               in
               let gl_repo =
                 Option.value
-                  (Config.subkey_value
-                     (Config.toml_of_string content)
+                  (Utils.subkey_value
+                     (Utils.toml_of_string content)
                      "mapping" "gitlab" )
                   ~default:gh_repo
               in
@@ -93,8 +92,8 @@ let execute_cmd ?(mask = []) command =
   Lwt_io.printf "Executing command: %s\n" command
   >>= fun () ->
   let process = Lwt_process.open_process_full (Lwt_process.shell command) in
-  let stdout_pipe = copy_stream ~src:process#stdout ~dst:Lwt_io.stdout in
-  let stderr_pipe = copy_stream ~src:process#stderr ~dst:Lwt_io.stderr in
+  let stdout_pipe = Utils.copy_stream ~src:process#stdout ~dst:Lwt_io.stdout in
+  let stderr_pipe = Utils.copy_stream ~src:process#stderr ~dst:Lwt_io.stderr in
   (* Capture stdout and stderr in parallel *)
   (* Wait for the process to finish *)
   let+ _stdout_content = stdout_pipe
