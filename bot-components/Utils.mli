@@ -34,3 +34,10 @@ val generic_get_zip :
   -> ?header_list:(string * string) list
   -> ((Zip.entry * string) list -> 'a)
   -> ('a, string) result Lwt.t
+
+val copy_stream :
+  src:Lwt_io.input_channel -> dst:Lwt_io.output_channel -> string Lwt.t
+
+val toml_of_string : string -> Toml.Types.table
+
+val subkey_value : Toml.Types.table -> string -> string -> string option
