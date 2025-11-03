@@ -23,6 +23,15 @@ let headers_of_list = headers
 let github_header bot_info =
   [("Authorization", "bearer " ^ github_token bot_info)]
 
+(* GitHub API preview headers *)
+let project_api_preview_header =
+  [("Accept", "application/vnd.github.inertia-preview+json")]
+
+let app_api_preview_header =
+  [("Accept", "application/vnd.github.machine-man-preview+json")]
+
+let api_json_header = [("Accept", "application/vnd.github+json")]
+
 (* ========================================================================== *)
 (* HTTP Client Operations *)
 (* ========================================================================== *)

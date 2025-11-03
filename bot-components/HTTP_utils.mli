@@ -2,6 +2,13 @@ val headers : (string * string) list -> string -> Cohttp.Header.t
 
 val github_header : Bot_info.t -> (string * string) list
 
+(* GitHub API preview headers *)
+val project_api_preview_header : (string * string) list
+
+val app_api_preview_header : (string * string) list
+
+val api_json_header : (string * string) list
+
 val print_response : Cohttp.Response.t * Cohttp_lwt.Body.t -> unit Lwt.t
 
 val send_request :
