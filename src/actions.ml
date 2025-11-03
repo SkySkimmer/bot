@@ -3,7 +3,6 @@ open Bot_components
 open Bot_components.Bot_info
 open Bot_components.GitHub_types
 open Bot_components.GitLab_types
-open Bot_components.CI_utils
 open Cohttp
 open Cohttp_lwt_unix
 open Git_utils
@@ -85,7 +84,7 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
       Lwt.return_unit
 
 let fetch_bench_results ~job_info () =
-  let open BenchResults in
+  let open CI_utils.BenchResults in
   let open Lwt.Syntax in
   let fetch_artifact url =
     url |> Uri.of_string |> Client.get
@@ -145,14 +144,8 @@ let fetch_bench_results ~job_info () =
   | Ok summary_table -> (
       (* The tables include how many entries there are, this is useful
          information to know. *)
-      let parse_quantity table table_name =
-        let regexp = {|.*TOP \([0-9]*\)|} in
-        if String_utils.string_match ~regexp table then
-          Str.matched_group 1 table |> Int.of_string |> Lwt.return_ok
-        else Lwt.return_error (f "parsing %s table." table_name)
-      in
-      let* slow_number = parse_quantity slow_table "slow" in
-      let* fast_number = parse_quantity fast_table "fast" in
+      let* slow_number = CI_utils.parse_quantity slow_table "slow" in
+      let* fast_number = CI_utils.parse_quantity fast_table "fast" in
       match (slow_number, fast_number) with
       | Error e, _ | _, Error e ->
           Lwt.return_error (f "Fetch bench regex issue: %s" e)
@@ -166,7 +159,7 @@ let fetch_bench_results ~job_info () =
             ; fast_number } )
 
 let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
-    (results : (BenchResults.t, string) Result.t) =
+    (results : (CI_utils.BenchResults.t, string) Result.t) =
   GitHub_queries.get_pull_request_id ~bot_info ~owner ~repo ~number
   >>= function
   | Ok id -> (
@@ -572,7 +565,7 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                   Lwt_io.printf "No repo id: %s\n" e
               | Ok repo_id -> (
                   let summary =
-                    create_pipeline_summary ?summary_top pipeline_info
+                    CI_utils.create_pipeline_summary ?summary_top pipeline_info
                       pipeline_url
                   in
                   GitHub_mutations.create_check_run ~bot_info
@@ -616,7 +609,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
     (String.concat ~sep:" " minimizer_extra_arguments)
   >>= fun () ->
   ( match script with
-  | CI_utils.MinimizeScript {quote_kind; body} ->
+  | Minimize_parser.MinimizeScript {quote_kind; body} ->
       if
         List.mem ~equal:String.equal
           ["shell"; "sh"; "shell-script"; "bash"; "zsh"]
@@ -634,7 +627,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
         Lwt.return
           (f "#!/usr/bin/env bash\ncat > %s <<'EOF'\n%s\nEOF\ncoqc -q %s" fname
              body fname )
-  | CI_utils.MinimizeAttachment {description; url} ->
+  | Minimize_parser.MinimizeAttachment {description; url} ->
       Lwt.return
         ( "#!/usr/bin/env bash\n"
         ^ Stdlib.Filename.quote_command "./handle-web-file.sh" [description; url]
@@ -741,7 +734,7 @@ let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
                         ; full_target= target (* dummy value *) } ]
                     ~bug_file:
                       (Some
-                         (CI_utils.MinimizeScript
+                         (Minimize_parser.MinimizeScript
                             {quote_kind= ""; body= bug_file_contents} ) ) )
                >>= function
                | Ok ([], []) ->

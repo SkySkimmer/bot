@@ -1,4 +1,5 @@
 open Bot_components
+open Bot_components.Minimize_parser
 
 val job_action :
      bot_info:Bot_info.t
@@ -14,7 +15,7 @@ val pipeline_action :
 
 val run_coq_minimizer :
      bot_info:Bot_info.t
-  -> script:CI_utils.minimize_parsed
+  -> script:minimize_parsed
   -> comment_thread_id:GitHub_ID.t
   -> comment_author:string
   -> owner:string
@@ -101,7 +102,7 @@ val ci_minimize :
   -> requests:string list
   -> comment_on_error:bool
   -> options:string
-  -> bug_file:CI_utils.minimize_parsed option
+  -> bug_file:minimize_parsed option
   -> unit Lwt.t
 
 val coq_bug_minimizer_resume_ci_minimization_action :

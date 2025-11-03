@@ -90,12 +90,6 @@ type ci_pr_minimization_suggestion =
   | RunAutomatically
   | Silent of string
 
-(* TODO: This type should move to Minimize_parser once it's created.
-   Temporary definition here for compilation until Minimize_parser exists. *)
-type minimize_parsed =
-  | MinimizeScript of {quote_kind: string; body: string}
-  | MinimizeAttachment of {description: string; url: string}
-
 (******************************************************************************)
 (* GitLab Trace Processing Utilities                                         *)
 (******************************************************************************)
@@ -561,7 +555,7 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
        match bug_file with
        | None ->
            Lwt.return_ok ()
-       | Some (MinimizeScript {body= bug_file_contents}) ->
+       | Some (Minimize_parser.MinimizeScript {body= bug_file_contents}) ->
            Lwt_io.write bug_file_ch bug_file_contents >>= Lwt.return_ok
        | Some (MinimizeAttachment {url}) -> (
          match parse_github_artifact_url url with

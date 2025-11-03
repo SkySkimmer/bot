@@ -81,12 +81,6 @@ type ci_pr_minimization_suggestion =
   | RunAutomatically
   | Silent of string
 
-(* TODO: This type should move to Minimize_parser once it's created.
-   Temporary definition here for compilation until Minimize_parser exists. *)
-type minimize_parsed =
-  | MinimizeScript of {quote_kind: string; body: string}
-  | MinimizeAttachment of {description: string; url: string}
-
 (******************************************************************************)
 (* GitLab Trace Processing Utilities                                         *)
 (******************************************************************************)
@@ -171,7 +165,7 @@ val run_ci_minimization :
   -> base:string
   -> head:string
   -> ci_minimization_infos:ci_minimization_info list
-  -> bug_file:minimize_parsed option
+  -> bug_file:Minimize_parser.minimize_parsed option
   -> minimizer_extra_arguments:string list
   -> (string list * (string * string) list, run_ci_minimization_error) Result.t
      Lwt.t
@@ -218,7 +212,7 @@ val minimize_failed_tests :
   -> head_pipeline_summary:string option
   -> request:ci_minimization_request
   -> comment_on_error:bool
-  -> bug_file:minimize_parsed option
+  -> bug_file:Minimize_parser.minimize_parsed option
   -> options:string
   -> ?base_sha:string
   -> ?head_sha:string

@@ -47,157 +47,14 @@ let string_of_installation_tokens =
 (* TODO: deprecate unsigned webhooks *)
 
 let callback _conn req body =
-  let ( coqbot_minimize_text_of_body
-      , coqbot_ci_minimize_text_of_body
-      , coqbot_resume_ci_minimize_text_of_body ) =
-    let extract_minimize_file body =
-      body
-      |> Str.split (Str.regexp_string "\n```")
-      |> List.hd |> Option.value ~default:""
-    in
-    let extract_minimize_script quote_kind body =
-      CI_utils.MinimizeScript
-        { quote_kind= quote_kind |> Str.global_replace (Str.regexp "[ \r]") ""
-        ; body= body |> extract_minimize_file }
-    in
-    let extract_minimize_url url =
-      url |> Str.global_replace (Str.regexp "^[` ]+\\|[` ]+$") ""
-    in
-    let extract_minimize_attachment ?(description = "") url =
-      CI_utils.MinimizeAttachment {description; url= url |> extract_minimize_url}
-    in
-    let parse_minimiation_requests requests =
-      requests
-      |> Str.global_replace (Str.regexp "[ ,]+") " "
-      |> String.split ~on:' '
-      |> List.map ~f:Stdlib.String.trim
-      (* remove trailing : in case the user stuck a : at the end of the line *)
-      |> List.map ~f:(Str.global_replace (Str.regexp ":$") "")
-      |> List.filter ~f:(fun r -> not (String.is_empty r))
-    in
-    let coqbot_minimize_text_of_body body =
-      if
-        String_utils.string_match
-          ~regexp:
-            ( f
-                "@%s:? [Mm]inimize\\([^`]*\\)```\\([^\n\
-                 ]*\\)\n\
-                 \\(\\(.\\|\n\
-                 \\)+\\)"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        (* avoid internal server errors from unclear execution order *)
-        let options, quote_kind, body =
-          ( Str.matched_group 1 body
-          , Str.matched_group 2 body
-          , Str.matched_group 3 body )
-        in
-        Some (options, extract_minimize_script quote_kind body)
-      else if
-        string_match
-          ~regexp:
-            ( f "@%s? [Mm]inimize\\([^`]*\\)\\[\\([^]]*\\)\\] *(\\([^)]*\\))"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        (* avoid internal server errors from unclear execution order *)
-        let options, description, url =
-          ( Str.matched_group 1 body
-          , Str.matched_group 2 body
-          , Str.matched_group 3 body )
-        in
-        Some (options, extract_minimize_attachment ~description url)
-      else None
-    in
-    let coqbot_ci_minimize_text_of_body body =
-      if
-        string_match
-          ~regexp:
-            ( f "@%s:?\\( [^\n]*\\)\\b[Cc][Ii][- ][Mm]inimize:?\\([^\n]*\\)"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        let options, requests =
-          (Str.matched_group 1 body, Str.matched_group 2 body)
-        in
-        Some (options, requests |> parse_minimiation_requests)
-      else None
-    in
-    let coqbot_resume_ci_minimize_text_of_body body =
-      if
-        string_match
-          ~regexp:
-            ( f
-                "@%s:?\\( [^\n\
-                 ]*\\)\\bresume [Cc][Ii][- ][Mm]inimiz\\(e\\|ation\\):?\\([^\n\
-                 ]*\\)\n\
-                 +```\\([^\n\
-                 ]*\\)\n\
-                 \\(\\(.\\|\n\
-                 \\)+\\)"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        let options, requests, quote_kind, body =
-          ( Str.matched_group 1 body
-          , Str.matched_group 3 body
-          , Str.matched_group 4 body
-          , Str.matched_group 5 body )
-        in
-        Some
-          ( options
-          , requests |> parse_minimiation_requests
-          , extract_minimize_script quote_kind body )
-      else if
-        string_match
-          ~regexp:
-            ( f
-                "@%s:?\\( [^\n\
-                 ]*\\)\\bresume [Cc][Ii][- ][Mm]inimiz\\(e\\|ation\\):?[ \n\
-                 ]+\\([^ \n\
-                 ]+\\)[ \n\
-                 ]+\\[\\([^]]*\\)\\] *(\\([^)]*\\))"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        let options, requests, description, url =
-          ( Str.matched_group 1 body
-          , Str.matched_group 3 body
-          , Str.matched_group 4 body
-          , Str.matched_group 5 body )
-        in
-        Some
-          ( options
-          , requests |> parse_minimiation_requests
-          , extract_minimize_attachment ~description url )
-      else if
-        string_match
-          ~regexp:
-            ( f
-                "@%s:?\\( [^\n\
-                 ]*\\)\\bresume [Cc][Ii][- ][Mm]inimiz\\(e\\|ation\\):?[ \n\
-                 ]+\\([^ \n\
-                 ]+\\)[ \n\
-                 ]+\\(https?://[^ \n\
-                 ]+\\)"
-            @@ Str.quote github_bot_name )
-          body
-      then
-        let options, requests, url =
-          ( Str.matched_group 1 body
-          , Str.matched_group 3 body
-          , Str.matched_group 4 body )
-        in
-        Some
-          ( options
-          , requests |> parse_minimiation_requests
-          , extract_minimize_attachment url )
-      else None
-    in
-    ( coqbot_minimize_text_of_body
-    , coqbot_ci_minimize_text_of_body
-    , coqbot_resume_ci_minimize_text_of_body )
+  let coqbot_minimize_text_of_body =
+    Minimize_parser.coqbot_minimize_text_of_body ~github_bot_name
+  in
+  let coqbot_ci_minimize_text_of_body =
+    Minimize_parser.coqbot_ci_minimize_text_of_body ~github_bot_name
+  in
+  let coqbot_resume_ci_minimize_text_of_body =
+    Minimize_parser.coqbot_resume_ci_minimize_text_of_body ~github_bot_name
   in
   let body = Cohttp_lwt.Body.to_string body in
   (* print_endline "Request received."; *)
@@ -564,18 +421,7 @@ let callback _conn req body =
               ~body:"Request to rerun check run but empty external ID." ()
           else
             let external_id_parsed =
-              match String.split ~on:',' external_id with
-              | [http_repo_url; url_part] -> (
-                match Git_utils.parse_gitlab_repo_url ~http_repo_url with
-                | Error _ ->
-                    None
-                | Ok (gitlab_domain, _) ->
-                    Some (gitlab_domain, url_part) )
-              | [url_part] ->
-                  (* Backward compatibility *)
-                  Some ("gitlab.com", url_part)
-              | _ ->
-                  None
+              Minimize_parser.parse_check_run_external_id external_id
             in
             match external_id_parsed with
             | None ->
