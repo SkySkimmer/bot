@@ -1,5 +1,6 @@
 open Base
-open Helpers
+open Bot_components
+open Utils
 
 let toml_of_file file_path = Toml.Parser.(from_filename file_path |> unsafe)
 

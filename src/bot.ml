@@ -6,7 +6,7 @@ open Bot_components
 open Botlib
 open Actions
 open Github_installations
-open Helpers
+open Utils
 
 let toml_data = Config.toml_of_file (Sys.get_argv ()).(1)
 
@@ -560,7 +560,7 @@ let callback _conn req body =
             let external_id_parsed =
               match String.split ~on:',' external_id with
               | [http_repo_url; url_part] -> (
-                match Helpers.parse_gitlab_repo_url ~http_repo_url with
+                match Utils.parse_gitlab_repo_url ~http_repo_url with
                 | Error _ ->
                     None
                 | Ok (gitlab_domain, _) ->

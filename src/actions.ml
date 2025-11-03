@@ -7,7 +7,7 @@ open Cohttp
 open Cohttp_lwt_unix
 open Coq_utils
 open Git_utils
-open Helpers
+open Utils
 open Lwt.Infix
 open Lwt.Syntax
 
@@ -346,7 +346,7 @@ let fetch_bench_results ~job_info () =
          information to know. *)
       let parse_quantity table table_name =
         let regexp = {|.*TOP \([0-9]*\)|} in
-        if Helpers.string_match ~regexp table then
+        if Utils.string_match ~regexp table then
           Str.matched_group 1 table |> Int.of_string |> Lwt.return_ok
         else Lwt.return_error (f "parsing %s table." table_name)
       in
@@ -3188,14 +3188,14 @@ let run_bench ~bot_info ?key_value_pairs comment_info =
             f {|.*%s\([0-9]*\)|}
               (Str.quote "[bench](https://gitlab.inria.fr/coq/coq/-/jobs/")
           in
-          ( if Helpers.string_match ~regexp summary then
+          ( if Utils.string_match ~regexp summary then
               Str.matched_group 1 summary
             else raise @@ Stdlib.Failure "Could not find GitLab bench job ID" )
           |> Stdlib.int_of_string
         in
         let project_id =
           let regexp = {|.*GitLab Project ID: \([0-9]*\)|} in
-          ( if Helpers.string_match ~regexp summary then
+          ( if Utils.string_match ~regexp summary then
               Str.matched_group 1 summary
             else raise @@ Stdlib.Failure "Could not find GitLab Project ID" )
           |> Int.of_string
