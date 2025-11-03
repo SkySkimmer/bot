@@ -29,6 +29,10 @@ val code_wrap : string -> string
 (* HTML/Comment Processing *)
 (* ========================================================================== *)
 
+val markdown_details : string -> string -> string
+
+val markdown_link : string -> string -> string
+
 val trim_comments : string -> string
 
 (* ========================================================================== *)

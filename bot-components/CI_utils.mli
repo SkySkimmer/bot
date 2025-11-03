@@ -122,14 +122,24 @@ val accumulate_extra_minimizer_arguments : string -> string list Lwt.t
 (* CI Job Info and Benchmark Utilities                                       *)
 (******************************************************************************)
 
+val fetch_bench_results :
+     job_info:GitLab_types.ci_common_info GitLab_types.job_info
+  -> unit
+  -> (BenchResults.t, string) Result.t Lwt.t
+
 val bench_text : (BenchResults.t, string) Result.t -> string Lwt.t
-(** [bench_text results] formats benchmark results as markdown text *)
 
 (******************************************************************************)
 (* GitHub Artifact Parsing                                                   *)
 (******************************************************************************)
 
 val parse_github_artifact_url : string -> artifact_info option
+
+(******************************************************************************)
+(* Artifact Fetching Utilities                                               *)
+(******************************************************************************)
+
+val fetch_artifact : string -> (string, string) Result.t Lwt.t
 
 (******************************************************************************)
 (* CI Status Check Functions                                                 *)

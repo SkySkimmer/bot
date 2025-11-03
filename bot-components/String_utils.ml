@@ -43,6 +43,11 @@ let remove_between s i j =
 
 let code_wrap str = f "```\n%s\n```" str
 
+let markdown_details summary text =
+  f "<details>\n<summary>%s</summary>\n\n%s\n\n</details>\n" summary text
+
+let markdown_link text url = f "[%s](%s)" text url
+
 (* ========================================================================== *)
 (* HTML/Comment Processing *)
 (* ========================================================================== *)

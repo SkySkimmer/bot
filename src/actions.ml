@@ -83,81 +83,6 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
   | _ ->
       Lwt.return_unit
 
-let fetch_bench_results ~job_info () =
-  let open CI_utils.BenchResults in
-  let open Lwt.Syntax in
-  let fetch_artifact url =
-    url |> Uri.of_string |> Client.get
-    >>= fun (resp, body) ->
-    let status_code = resp |> Response.status |> Code.code_of_status in
-    if Int.equal 200 status_code then
-      body |> Cohttp_lwt.Body.to_string >>= Lwt.return_ok
-    else Lwt.return_error (f "Recieved status %d from %s." status_code url)
-  in
-  let artifact_url file =
-    f
-      "https://coq.gitlabpages.inria.fr/-/coq/-/jobs/%d/artifacts/_bench/timings/%s"
-      job_info.build_id file
-  in
-  let* summary_table = artifact_url "bench_summary" |> fetch_artifact in
-  let* failures =
-    let* failures_or_err = artifact_url "bench_failures" |> fetch_artifact in
-    match failures_or_err with
-    | Ok s ->
-        Lwt.return s
-    | Error err ->
-        Lwt_io.printlf "Error fetching bench_failures: %s" err
-        >>= fun () -> Lwt.return ""
-  in
-  let* slow_table =
-    let* slow_table_or_err = artifact_url "slow_table.html" |> fetch_artifact in
-    match slow_table_or_err with
-    | Ok s ->
-        Lwt.return s
-    | Error _ -> (
-        let* slow_table_or_err = artifact_url "slow_table" |> fetch_artifact in
-        match slow_table_or_err with
-        | Ok s ->
-            Lwt.return (String_utils.code_wrap s)
-        | Error err ->
-            Lwt_io.printlf "Error fetching slow_table: %s" err
-            >>= fun () -> Lwt.return "" )
-  in
-  let* fast_table =
-    let* fast_table_or_err = artifact_url "fast_table.html" |> fetch_artifact in
-    match fast_table_or_err with
-    | Ok s ->
-        Lwt.return s
-    | Error _ -> (
-        let* fast_table_or_err = artifact_url "fast_table" |> fetch_artifact in
-        match fast_table_or_err with
-        | Ok s ->
-            Lwt.return (String_utils.code_wrap s)
-        | Error err ->
-            Lwt_io.printlf "Error fetching fast_table: %s" err
-            >>= fun () -> Lwt.return "" )
-  in
-  match summary_table with
-  | Error e ->
-      Lwt.return_error
-        (f "Could not fetch table artifacts for bench summary: %s\n" e)
-  | Ok summary_table -> (
-      (* The tables include how many entries there are, this is useful
-         information to know. *)
-      let* slow_number = CI_utils.parse_quantity slow_table "slow" in
-      let* fast_number = CI_utils.parse_quantity fast_table "fast" in
-      match (slow_number, fast_number) with
-      | Error e, _ | _, Error e ->
-          Lwt.return_error (f "Fetch bench regex issue: %s" e)
-      | Ok slow_number, Ok fast_number ->
-          Lwt.return_ok
-            { summary_table
-            ; failures
-            ; slow_table
-            ; slow_number
-            ; fast_table
-            ; fast_number } )
-
 let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
     (results : (CI_utils.BenchResults.t, string) Result.t) =
   GitHub_queries.get_pull_request_id ~bot_info ~owner ~repo ~number
@@ -165,24 +90,22 @@ let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
   | Ok id -> (
     match results with
     | Ok results -> (
-        (* Formatting heleprs *)
-        let details summary text =
-          f "<details>\n<summary>%s</summary>\n\n%s\n\n</details>\n" summary
-            text
-        in
-        let link text url = f "[%s](%s)" text url in
         [ ":checkered_flag: Bench results:"
         ; String_utils.code_wrap results.summary_table
         ; results.failures
-        ; details
+        ; String_utils.markdown_details
             (f ":turtle: Top %d slow downs" results.slow_number)
             results.slow_table
-        ; details
+        ; String_utils.markdown_details
             (f ":rabbit2: Top %d speed ups" results.fast_number)
             results.fast_table
-        ; "- " ^ link ":chair: GitLab Bench Job" gitlab_url ]
+        ; "- "
+          ^ String_utils.markdown_link ":chair: GitLab Bench Job" gitlab_url ]
         @ Option.value_map
-            ~f:(fun x -> ["- " ^ link ":spiral_notepad: Bench Check Summary" x])
+            ~f:(fun x ->
+              [ "- "
+                ^ String_utils.markdown_link
+                    ":spiral_notepad: Bench Check Summary" x ] )
             ~default:[] check_url
         |> String.concat ~sep:"\n"
         |> fun message ->
@@ -240,7 +163,7 @@ let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
           in
           match state with
           | "success" ->
-              let* results = fetch_bench_results ~job_info () in
+              let* results = CI_utils.fetch_bench_results ~job_info () in
               let* text = CI_utils.bench_text results in
               let* check_url =
                 create_check_run ~status:COMPLETED ~conclusion:SUCCESS
@@ -252,7 +175,7 @@ let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
               in
               Lwt.return_unit
           | "failed" ->
-              let* results = fetch_bench_results ~job_info () in
+              let* results = CI_utils.fetch_bench_results ~job_info () in
               let* text = CI_utils.bench_text results in
               let* check_url =
                 create_check_run ~status:COMPLETED ~conclusion:NEUTRAL
@@ -940,60 +863,6 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
       GitHub_mutations.post_comment ~bot_info ~message:err ~id:pr.id
       >>= GitHub_mutations.report_on_posting_comment
 
-let add_remove_labels ~bot_info ~add (issue : issue_info) labels =
-  let open Lwt.Syntax in
-  let* labels =
-    let open Lwt.Infix in
-    labels
-    |> Lwt_list.filter_map_p (fun label ->
-           GitHub_queries.get_label ~bot_info ~owner:issue.issue.owner
-             ~repo:issue.issue.repo ~label
-           >|= function
-           | Ok (Some label) ->
-               Some label
-           | Ok None ->
-               (* Warn when a label is not found *)
-               (fun () ->
-                 Lwt_io.printlf
-                   "Warning: Label %s not found in repository %s/%s." label
-                   issue.issue.owner issue.issue.repo )
-               |> Lwt.async ;
-               None
-           | Error err ->
-               (* Print any other error, but do not prevent acting on other labels *)
-               (fun () ->
-                 Lwt_io.printlf
-                   "Error while querying for label %s in repository %s/%s: %s"
-                   label issue.issue.owner issue.issue.repo err )
-               |> Lwt.async ;
-               None )
-  in
-  match labels with
-  | [] ->
-      (* Nothing to do *)
-      Lwt.return_unit
-  | _ ->
-      if add then GitHub_mutations.add_labels ~bot_info ~issue:issue.id ~labels
-      else GitHub_mutations.remove_labels ~bot_info ~issue:issue.id ~labels
-
-let add_labels_if_absent ~bot_info (issue : issue_info) labels =
-  (* We construct the list of labels to add by filtering out the labels that
-     are already present. *)
-  (fun () ->
-    List.filter labels ~f:(fun label ->
-        not (List.mem issue.labels label ~equal:String.equal) )
-    |> add_remove_labels ~bot_info ~add:true issue )
-  |> Lwt.async
-
-let remove_labels_if_present ~bot_info (issue : issue_info) labels =
-  (* We construct the list of labels to remove by keeping only the labels that
-     are present. *)
-  (fun () ->
-    List.filter labels ~f:(fun label ->
-        List.mem issue.labels label ~equal:String.equal )
-    |> add_remove_labels ~bot_info ~add:false issue )
-  |> Lwt.async
-
 (* TODO: ensure there's no race condition for 2 push with very close timestamps *)
 let mirror_action ~bot_info ?(force = true) ~gitlab_domain ~gh_owner ~gh_repo
     ~gl_owner ~gl_repo ~base_ref ~head_sha () =
@@ -1044,7 +913,8 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
   let open Lwt_result.Syntax in
   if ok then (
     (* Remove rebase / stale label *)
-    remove_labels_if_present ~bot_info pr_info.issue [rebase_label; stale_label] ;
+    GitHub_mutations.remove_labels_if_present ~bot_info pr_info.issue
+      [rebase_label; stale_label] ;
     (* In the Rocq Prover repo, we want to prevent untrusted contributors from
        circumventing the fact that the bench job is a manual job by changing
        the CI configuration. *)
@@ -1074,7 +944,8 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
     let open Lwt.Infix in
     if not can_trigger_ci then (
       (* Since we cannot trigger CI, in particular, we still need to run a full CI *)
-      add_labels_if_absent ~bot_info pr_info.issue [needs_full_ci_label] ;
+      GitHub_mutations.add_labels_if_absent ~bot_info pr_info.issue
+        [needs_full_ci_label] ;
       GitHub_mutations.post_comment ~bot_info ~id:pr_info.issue.id
         ~message:
           "I am not triggering a CI run on this PR because the CI \
@@ -1111,12 +982,13 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
                match full_ci with
                | Some false ->
                    (* Light CI requested *)
-                   add_labels_if_absent ~bot_info pr_info.issue
+                   GitHub_mutations.add_labels_if_absent ~bot_info pr_info.issue
                      [needs_full_ci_label] ;
                    Lwt.return {| -o ci.variable="FULL_CI=false" |}
                | Some true ->
                    (* Full CI requested *)
-                   remove_labels_if_present ~bot_info pr_info.issue
+                   GitHub_mutations.remove_labels_if_present ~bot_info
+                     pr_info.issue
                      [needs_full_ci_label; request_full_ci_label] ;
                    Lwt.return {| -o ci.variable="FULL_CI=true" |}
                | None ->
@@ -1128,13 +1000,14 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
                             String.equal l request_full_ci_label )
                    then (
                      (* Full CI requested *)
-                     remove_labels_if_present ~bot_info pr_info.issue
+                     GitHub_mutations.remove_labels_if_present ~bot_info
+                       pr_info.issue
                        [needs_full_ci_label; request_full_ci_label] ;
                      Lwt.return {| -o ci.variable="FULL_CI=true" |} )
                    else (
                      (* Nothing requested *)
-                     add_labels_if_absent ~bot_info pr_info.issue
-                       [needs_full_ci_label] ;
+                     GitHub_mutations.add_labels_if_absent ~bot_info
+                       pr_info.issue [needs_full_ci_label] ;
                      Lwt.return {| -o ci.variable="FULL_CI=false" |} ) ) ]
           >|= fun options -> String.concat ~sep:" " options
         else Lwt.return ""
@@ -1150,7 +1023,7 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
       |> execute_cmd )
   else (
     (* Add rebase label if it exists *)
-    add_labels_if_absent ~bot_info pr_info.issue [rebase_label] ;
+    GitHub_mutations.add_labels_if_absent ~bot_info pr_info.issue [rebase_label] ;
     (* Add fail status check *)
     match bot_info.github_install_token with
     | None ->
@@ -1478,20 +1351,6 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
   in
   Lwt_list.iter_s commit_action commits_msg
 
-let days_elapsed ts =
-  (* Yes, I know this is wrong because of DST and black holes but it should
-     still be correct enough *)
-  Float.to_int ((Unix.time () -. ts) /. (3600. *. 24.))
-
-let rec apply_throttle len action args =
-  if List.is_empty args || len <= 0 then Lwt.return_unit
-  else
-    let args, rem = List.split_n args len in
-    Lwt_list.map_p action args
-    >>= fun ans ->
-    let n = List.count ~f:(fun b -> b) ans in
-    apply_throttle (len - n) action rem
-
 let apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
     =
   GitHub_queries.get_open_pull_requests_with_label ~bot_info ~owner ~repo ~label
@@ -1515,13 +1374,13 @@ let apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
                     (f {|Anomaly: Label "%s" absent from timeline of PR #%i|}
                        label pr_number )
               | Some ts ->
-                  days_elapsed ts
+                  Utils.days_elapsed ts
             in
             if days >= after then action pr_id pr_number else Lwt.return false
         | Error e ->
             Lwt_io.print (f "Error: %s\n" e) >>= fun () -> Lwt.return false
       in
-      apply_throttle throttle iter prs
+      Utils.apply_throttle throttle iter prs
   | Error err ->
       Lwt_io.print (f "Error: %s\n" err)
 
