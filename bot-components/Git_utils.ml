@@ -212,6 +212,18 @@ let git_run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
   |> Stdlib.Filename.quote_command "./run_ci_minimization.sh"
   |> execute_cmd ~mask:[bot_info.github_pat]
 
+let init_git_bare_repository ~bot_info =
+  let* () = Lwt_io.printl "Initializing repository..." in
+  "git init --bare"
+  |&& f {|git config user.email "%s"|} bot_info.email
+  |&& f {|git config user.name "%s"|} bot_info.github_name
+  |> execute_cmd ~mask:[bot_info.github_pat]
+  >>= function
+  | Ok _ ->
+      Lwt_io.printl "Bare repository initialized."
+  | Error e ->
+      Lwt_io.printlf "Error while initializing bare repository: %s." e
+
 let pr_from_branch branch =
   if String_utils.string_match ~regexp:"^pr-\\([0-9]*\\)$" branch then
     (Some (Str.matched_group 1 branch |> Int.of_string), "pull request")
