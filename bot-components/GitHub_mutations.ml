@@ -280,7 +280,9 @@ let remove_labels ~bot_info ~labels ~issue =
 (* TODO: use GraphQL API *)
 
 let remove_milestone ~bot_info (issue : issue) =
-  let headers = headers (github_header bot_info) bot_info.github_name in
+  let headers =
+    HTTP_utils.headers (HTTP_utils.github_header bot_info) bot_info.github_name
+  in
   let uri =
     f "https://api.github.com/repos/%s/%s/issues/%d" issue.owner issue.repo
       issue.number
@@ -288,7 +290,7 @@ let remove_milestone ~bot_info (issue : issue) =
   in
   let body = {|{"milestone": null}|} |> Cohttp_lwt.Body.of_string in
   Lwt_io.printf "Sending patch request.\n"
-  >>= fun () -> Client.patch ~headers ~body uri >>= print_response
+  >>= fun () -> Client.patch ~headers ~body uri >>= HTTP_utils.print_response
 
 let send_status_check ~bot_info ~repo_full_name ~commit ~state ~url ~context
     ~description =
@@ -305,4 +307,6 @@ let send_status_check ~bot_info ~repo_full_name ~commit ~state ~url ~context
     "https://api.github.com/repos/" ^ repo_full_name ^ "/statuses/" ^ commit
     |> Uri.of_string
   in
-  send_request ~body ~uri (github_header bot_info) bot_info.github_name
+  HTTP_utils.send_request ~body ~uri
+    (HTTP_utils.github_header bot_info)
+    bot_info.github_name

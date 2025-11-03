@@ -1025,7 +1025,7 @@ let get_project_field_values ~bot_info ~organization ~project ~field ~options =
       Lwt.return_error err
 
 let get_artifact_blob ~bot_info ~owner ~repo ~artifact_id =
-  generic_get_zip ~bot_info
+  HTTP_utils.generic_get_zip ~bot_info
     (f "repos/%s/%s/actions/artifacts/%s/zip" owner repo artifact_id)
     (let open Zip in
      List.map ~f:(fun (entry, contents) -> (entry.filename, contents)) )
