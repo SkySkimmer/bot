@@ -13,7 +13,7 @@
    ((pps graphql_ppx -- -native -schema bot-components/gitlab-schema.json)
     GitLab_GraphQL)
    ((pps ppx_expect)
-    Utils
+    String_utils
     Git_utils)))
  (preprocessor_deps
   (file github-schema.json)
