@@ -560,7 +560,7 @@ let callback _conn req body =
             let external_id_parsed =
               match String.split ~on:',' external_id with
               | [http_repo_url; url_part] -> (
-                match Utils.parse_gitlab_repo_url ~http_repo_url with
+                match Git_utils.parse_gitlab_repo_url ~http_repo_url with
                 | Error _ ->
                     None
                 | Ok (gitlab_domain, _) ->

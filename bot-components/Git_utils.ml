@@ -4,6 +4,7 @@ open GitHub_types
 open Lwt.Infix
 open Lwt.Syntax
 open Utils
+open String_utils
 
 let gitlab_repo ~bot_info ~gitlab_domain ~gitlab_full_name =
   gitlab_token bot_info gitlab_domain
@@ -20,8 +21,7 @@ let report_status ?(mask = []) ?(stderr_content = "") command report code =
        ~f:(fun acc m -> Str.global_replace (Str.regexp_string m) "XXXXX" acc)
        mask )
 
-let gitlab_ci_ref_for_github_pr ~bot_info ~(issue : issue) ~github_mapping
-    ~gitlab_mapping =
+let gitlab_ref ~bot_info ~(issue : issue) ~github_mapping ~gitlab_mapping =
   let default_gitlab_domain = "gitlab.com" in
   let gh_repo = issue.owner ^ "/" ^ issue.repo in
   let open Lwt.Infix in
@@ -93,8 +93,12 @@ let execute_cmd ?(mask = []) command =
   Lwt_io.printf "Executing command: %s\n" command
   >>= fun () ->
   let process = Lwt_process.open_process_full (Lwt_process.shell command) in
-  let stdout_pipe = Utils.copy_stream ~src:process#stdout ~dst:Lwt_io.stdout in
-  let stderr_pipe = Utils.copy_stream ~src:process#stderr ~dst:Lwt_io.stderr in
+  let stdout_pipe =
+    HTTP_utils.copy_stream ~src:process#stdout ~dst:Lwt_io.stdout
+  in
+  let stderr_pipe =
+    HTTP_utils.copy_stream ~src:process#stderr ~dst:Lwt_io.stderr
+  in
   (* Capture stdout and stderr in parallel *)
   (* Wait for the process to finish *)
   let+ _stdout_content = stdout_pipe
@@ -161,3 +165,123 @@ let git_test_modified ~base ~head pattern =
       Error (f "%s killed by signal %d." command signal)
   | Unix.WSTOPPED signal ->
       Error (f "%s stopped by signal %d." command signal)
+
+let git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
+    ~owner ~repo ~coq_version ~ocaml_version ~minimizer_extra_arguments =
+  (* To push a new branch we need to identify as coqbot the GitHub
+     user, who is a collaborator on the run-coq-bug-minimizer repo,
+     not coqbot the GitHub App *)
+  Stdlib.Filename.quote_command "./coq_bug_minimizer.sh"
+    [ script
+    ; GitHub_ID.to_string comment_thread_id
+    ; comment_author
+    ; bot_info.github_pat
+    ; bot_info.github_name
+    ; bot_info.domain
+    ; owner
+    ; repo
+    ; coq_version
+    ; ocaml_version
+    ; String.concat ~sep:" " minimizer_extra_arguments ]
+  |> execute_cmd ~mask:[bot_info.github_pat]
+
+let git_run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
+    ~docker_image ~target ~ci_targets ~opam_switch ~failing_urls ~passing_urls
+    ~base ~head ~minimizer_extra_arguments ~bug_file_name =
+  (* To push a new branch we need to identify as coqbot the GitHub
+     user, who is a collaborator on the run-coq-bug-minimizer repo,
+     not coqbot the GitHub App *)
+  ( [ GitHub_ID.to_string comment_thread_id
+    ; bot_info.github_pat
+    ; bot_info.github_name
+    ; bot_info.domain
+    ; owner
+    ; repo
+    ; pr_number
+    ; docker_image
+    ; target
+    ; String.concat ~sep:" " ci_targets
+    ; opam_switch
+    ; failing_urls
+    ; passing_urls
+    ; base
+    ; head
+    ; String.concat ~sep:" " minimizer_extra_arguments ]
+  @
+  match bug_file_name with Some bug_file_name -> [bug_file_name] | None -> [] )
+  |> Stdlib.Filename.quote_command "./run_ci_minimization.sh"
+  |> execute_cmd ~mask:[bot_info.github_pat]
+
+let pr_from_branch branch =
+  if String_utils.string_match ~regexp:"^pr-\\([0-9]*\\)$" branch then
+    (Some (Str.matched_group 1 branch |> Int.of_string), "pull request")
+  else (None, "branch")
+
+let github_repo_of_gitlab_project_path ~gitlab_mapping ~gitlab_domain
+    ~gitlab_repo_full_name =
+  let full_name_with_domain = gitlab_domain ^ "/" ^ gitlab_repo_full_name in
+  let github_full_name =
+    match Hashtbl.find gitlab_mapping full_name_with_domain with
+    | Some value ->
+        value
+    | None ->
+        Stdio.printf
+          "Warning: No correspondence found for GitLab repository %s.\n"
+          full_name_with_domain ;
+        gitlab_repo_full_name
+  in
+  match Str.split (Str.regexp "/") github_full_name with
+  | [owner; repo] ->
+      (owner, repo)
+  | _ ->
+      failwith
+        (f "Could not split repository full name %s into (owner, repo)."
+           github_full_name )
+
+let parse_gitlab_repo_url ~http_repo_url =
+  if
+    not
+      (String_utils.string_match ~regexp:"https?://\\([^/]*\\)/\\(.*/.*\\)"
+         http_repo_url )
+  then
+    Result.Error (f "Could not parse GitLab repository URL %s." http_repo_url)
+  else
+    Result.Ok
+      (Str.matched_group 1 http_repo_url, Str.matched_group 2 http_repo_url)
+
+let parse_gitlab_repo_url_and_print ~http_repo_url =
+  match parse_gitlab_repo_url ~http_repo_url with
+  | Ok (gitlab_domain, gitlab_repo_full_name) ->
+      Stdio.printf "GitLab domain: \"%s\"\n" gitlab_domain ;
+      Stdio.printf "GitLab repository full name: \"%s\"\n" gitlab_repo_full_name
+  | Error msg ->
+      Stdio.print_endline msg
+
+let%expect_test "http_repo_url_parsing_coq" =
+  parse_gitlab_repo_url_and_print ~http_repo_url:"https://gitlab.com/coq/coq" ;
+  [%expect
+    {|
+   GitLab domain: "gitlab.com"
+   GitLab repository full name: "coq/coq" |}]
+
+let%expect_test "http_repo_url_parsing_mathcomp" =
+  parse_gitlab_repo_url_and_print
+    ~http_repo_url:"https://gitlab.inria.fr/math-comp/math-comp" ;
+  [%expect
+    {|
+  GitLab domain: "gitlab.inria.fr"
+  GitLab repository full name: "math-comp/math-comp" |}]
+
+let%expect_test "http_repo_url_parsing_example_from_gitlab_docs" =
+  parse_gitlab_repo_url_and_print
+    ~http_repo_url:"https://gitlab.example.com/gitlab-org/gitlab-test" ;
+  [%expect
+    {|
+  GitLab domain: "gitlab.example.com"
+  GitLab repository full name: "gitlab-org/gitlab-test" |}]
+
+let github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url =
+  parse_gitlab_repo_url ~http_repo_url
+  |> Result.map ~f:(fun (gitlab_domain, gitlab_repo_full_name) ->
+         github_repo_of_gitlab_project_path ~gitlab_mapping ~gitlab_domain
+           ~gitlab_repo_full_name )
