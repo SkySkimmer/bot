@@ -115,3 +115,12 @@ let shorten_ci_check_name target =
   |> Str.global_replace (Str.regexp "(pull request)") ""
   |> Str.global_replace (Str.regexp "(branch)") ""
   |> Stdlib.String.trim
+
+(* ========================================================================== *)
+(* Hashtable Formatting                                                       *)
+(* ========================================================================== *)
+
+let string_of_mapping mapping =
+  Hashtbl.fold ~init:""
+    ~f:(fun ~key ~data acc -> acc ^ Printf.sprintf "(%s, %s)\n" key data)
+    mapping

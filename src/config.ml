@@ -2,23 +2,6 @@ open Base
 open Bot_components
 open Utils
 
-let toml_of_file file_path = Toml.Parser.(from_filename file_path |> unsafe)
-
-let toml_of_string s = Toml.Parser.(from_string s |> unsafe)
-
-let find k = Toml.Types.Table.find (Toml.Types.Table.Key.of_string k)
-
-let subkey_value toml_table k k' =
-  Toml.Lenses.(get toml_table (key k |-- table |-- key k' |-- string))
-
-let list_table_keys toml_table =
-  Toml.Types.Table.fold
-    (fun k _ ks -> Toml.Types.Table.Key.to_string k :: ks)
-    toml_table []
-
-let string_of_mapping =
-  Hashtbl.fold ~init:"" ~f:(fun ~key ~data acc -> acc ^ f "(%s, %s)\n" key data)
-
 let port toml_data =
   Option.value_map
     (subkey_value toml_data "server" "port")

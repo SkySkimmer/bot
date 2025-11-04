@@ -5,8 +5,18 @@ let f = Printf.sprintf
 
 let toml_of_string s = Toml.Parser.(from_string s |> unsafe)
 
+let toml_of_file file_path = Toml.Parser.(from_filename file_path |> unsafe)
+
 let subkey_value toml_table k k' =
   Toml.Lenses.(get toml_table (key k |-- table |-- key k' |-- string))
+
+let find k toml_table =
+  Toml.Types.Table.find (Toml.Types.Table.Key.of_string k) toml_table
+
+let list_table_keys toml_table =
+  Toml.Types.Table.fold
+    (fun k _ ks -> Toml.Types.Table.Key.to_string k :: ks)
+    toml_table []
 
 let days_elapsed ts =
   (* Yes, I know this is wrong because of DST and black holes but it should

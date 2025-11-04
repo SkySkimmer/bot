@@ -48,3 +48,5 @@ val strip_quoted_bot_name : github_bot_name:string -> string -> string
 val clean_gitlab_trace : string -> string list
 
 val shorten_ci_check_name : string -> string
+
+val string_of_mapping : (string, string) Base.Hashtbl.t -> string

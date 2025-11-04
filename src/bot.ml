@@ -13,7 +13,7 @@ open String_utils
 open Utils
 open String_utils
 
-let toml_data = Config.toml_of_file (Sys.get_argv ()).(1)
+let toml_data = Utils.toml_of_file (Sys.get_argv ()).(1)
 
 let port = Config.port toml_data
 
