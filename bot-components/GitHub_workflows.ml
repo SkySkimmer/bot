@@ -2,6 +2,7 @@ open Base
 open GitHub_types
 open Utils
 open Lwt.Infix
+open Git_utils
 
 let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
   let pr = comment_info.issue in
@@ -158,6 +159,28 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
       GitHub_mutations.post_comment ~bot_info ~message:err ~id:pr.id
       >>= GitHub_mutations.report_on_posting_comment
 
+let reflect_pull_request_milestone ~bot_info pr_closer_info =
+  match pr_closer_info.closer.milestone_id with
+  | None ->
+      Lwt_io.printf "PR closed without a milestone: doing nothing.\n"
+  | Some milestone -> (
+    match pr_closer_info.milestone_id with
+    | None ->
+        (* No previous milestone: setting the one of the PR which closed the issue *)
+        GitHub_mutations.update_milestone_pull_request ~bot_info
+          ~pr_id:pr_closer_info.issue_id ~milestone
+    | Some previous_milestone when GitHub_ID.equal previous_milestone milestone
+      ->
+        Lwt_io.print "Issue is already in the right milestone: doing nothing.\n"
+    | Some _ ->
+        GitHub_mutations.update_milestone_pull_request ~bot_info
+          ~pr_id:pr_closer_info.issue_id ~milestone
+        <&> ( GitHub_mutations.post_comment ~bot_info ~id:pr_closer_info.issue_id
+                ~message:
+                  "The milestone of this issue was changed to reflect the one \
+                   of the pull request that closed it."
+            >>= GitHub_mutations.report_on_posting_comment ) )
+
 let rec adjust_milestone ~bot_info ~issue ~sleep_time =
   (* We implement an exponential backoff strategy to try again after
      5, 25, and 125 seconds, if the issue was closed by a commit not
@@ -166,7 +189,7 @@ let rec adjust_milestone ~bot_info ~issue ~sleep_time =
   GitHub_queries.get_issue_closer_info ~bot_info issue
   >>= function
   | Ok (ClosedByPullRequest result) ->
-      GitHub_mutations.reflect_pull_request_milestone ~bot_info result
+      reflect_pull_request_milestone ~bot_info result
   | Ok ClosedByCommit when Float.(sleep_time > 200.) ->
       Lwt_io.print "Closed by commit not associated to any pull request.\n"
   | Ok NoCloseEvent when Float.(sleep_time > 200.) ->
@@ -282,3 +305,88 @@ let add_to_column ~bot_info ~backport_to id option =
           Lwt_io.printf "Error while adding card to project: %s\n" err )
   | Error err ->
       Lwt_io.printl err
+
+let pull_request_closed_action ~bot_info
+    (pr_info : issue_info pull_request_info) ~gitlab_mapping ~github_mapping
+    ~remove_milestone_if_not_merged =
+  let open Lwt.Infix in
+  gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
+    ~bot_info
+  >>= (function
+        | Ok remote_ref ->
+            git_delete ~remote_ref |> execute_cmd >|= ignore
+        | Error err ->
+            Lwt_io.printlf "Error: %s" err )
+  <&>
+  if remove_milestone_if_not_merged && not pr_info.merged then
+    Lwt_io.printf
+      "PR was closed without getting merged: remove the milestone.\n"
+    >>= fun () ->
+    GitHub_mutations.remove_milestone pr_info.issue.issue ~bot_info
+  else
+    (* TODO: if PR was merged in master without a milestone, post an alert *)
+    Lwt.return_unit
+
+let add_remove_labels ~bot_info ~add (issue : issue_info) labels =
+  let open Lwt.Syntax in
+  let* labels =
+    let open Lwt.Infix in
+    labels
+    |> Lwt_list.filter_map_p (fun label ->
+           GitHub_queries.get_label ~bot_info ~owner:issue.issue.owner
+             ~repo:issue.issue.repo ~label
+           >|= function
+           | Ok (Some label) ->
+               Some label
+           | Ok None ->
+               (* Warn when a label is not found *)
+               (fun () ->
+                 Lwt_io.printlf
+                   "Warning: Label %s not found in repository %s/%s." label
+                   issue.issue.owner issue.issue.repo )
+               |> Lwt.async ;
+               None
+           | Error err ->
+               (* Print any other error, but do not prevent acting on other labels *)
+               (fun () ->
+                 Lwt_io.printlf
+                   "Error while querying for label %s in repository %s/%s: %s"
+                   label issue.issue.owner issue.issue.repo err )
+               |> Lwt.async ;
+               None )
+  in
+  match labels with
+  | [] ->
+      (* Nothing to do *)
+      Lwt.return_unit
+  | _ ->
+      if add then GitHub_mutations.add_labels ~bot_info ~issue:issue.id ~labels
+      else GitHub_mutations.remove_labels ~bot_info ~issue:issue.id ~labels
+
+let add_labels_if_absent ~bot_info (issue : issue_info) labels =
+  (* We construct the list of labels to add by filtering out the labels that
+     are already present. *)
+  (fun () ->
+    List.filter labels ~f:(fun label ->
+        not (List.mem issue.labels label ~equal:String.equal) )
+    |> add_remove_labels ~bot_info ~add:true issue )
+  |> Lwt.async
+
+let remove_labels_if_present ~bot_info (issue : issue_info) labels =
+  (* We construct the list of labels to remove by keeping only the labels that
+     are present. *)
+  (fun () ->
+    List.filter labels ~f:(fun label ->
+        List.mem issue.labels label ~equal:String.equal )
+    |> add_remove_labels ~bot_info ~add:false issue )
+  |> Lwt.async
+
+let inform_user_not_in_contributors ~bot_info ~comment_info =
+  GitHub_mutations.post_comment ~bot_info ~id:comment_info.issue.id
+    ~message:
+      (f
+         "Sorry, @%s, I only accept requests from members of the \
+          `@rocq-prover/contributors` team. If you are a regular contributor, \
+          you can request to join the team by asking any core developer."
+         comment_info.author )
+  >>= GitHub_mutations.report_on_posting_comment

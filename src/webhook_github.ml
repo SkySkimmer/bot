@@ -256,7 +256,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
         >>= fun () ->
         Bot_components.Github_installations.action_as_github_app ~bot_info ~key
           ~app_id ~owner:pr_info.issue.issue.owner
-          (GitHub_mutations.pull_request_closed_action pr_info ~gitlab_mapping
+          (GitHub_workflows.pull_request_closed_action pr_info ~gitlab_mapping
              ~github_mapping ~remove_milestone_if_not_merged:true ) )
       |> Lwt.async ;
       Server.respond_string ~status:`OK
