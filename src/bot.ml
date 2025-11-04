@@ -1,16 +1,7 @@
 open Base
-open Cohttp
 open Cohttp_lwt_unix
-open Lwt.Infix
 open Bot_components
-open Bot_components.CI_minimization
-open Bot_components.CI_job_status
-open Bot_components.Bench_utils
-open Botlib
-open Git_utils
-open Github_installations
-open String_utils
-open Utils
+open Bot_components.Minimize_parser
 
 let toml_data = Utils.toml_of_file (Sys.get_argv ()).(1)
 
@@ -46,17 +37,18 @@ let github_mapping, gitlab_mapping = Config.make_mappings_table toml_data
 
 let callback _conn req body =
   let coqbot_minimize_text_of_body =
-    Minimize_parser.coqbot_minimize_text_of_body ~github_bot_name
+    coqbot_minimize_text_of_body ~github_bot_name
   in
   let coqbot_ci_minimize_text_of_body =
-    Minimize_parser.coqbot_ci_minimize_text_of_body ~github_bot_name
+    coqbot_ci_minimize_text_of_body ~github_bot_name
   in
   let coqbot_resume_ci_minimize_text_of_body =
-    Minimize_parser.coqbot_resume_ci_minimize_text_of_body ~github_bot_name
+    coqbot_resume_ci_minimize_text_of_body ~github_bot_name
   in
   let body = Cohttp_lwt.Body.to_string body in
+  let path = Uri.path (Request.uri req) in
   (* print_endline "Request received."; *)
-  match Uri.path (Request.uri req) with
+  match path with
   | "/job" | "/pipeline" (* legacy endpoints *) | "/gitlab" -> (
       body
       >>= fun body ->
@@ -510,6 +502,24 @@ let callback _conn req body =
           Server.respond_string ~status:(Code.status_of_code 400)
             ~body:(f "Error: ill-formed request")
             () )
+=======
+  match path with
+  | "/job" | "/pipeline" (* legacy endpoints *) | "/gitlab" ->
+      Webhook_gitlab.handle_gitlab_webhook ~bot_info ~key ~app_id
+        ~gitlab_mapping ~gitlab_webhook_secret ~headers:(Request.headers req)
+        ~body
+  | "/push" | "/pull_request" (* legacy endpoints *) | "/github" ->
+      Webhook_github.handle_github_webhook ~bot_info ~key ~app_id
+        ~github_bot_name ~gitlab_mapping ~github_mapping ~github_webhook_secret
+        ~headers:(Request.headers req) ~body ~coqbot_minimize_text_of_body
+        ~coqbot_ci_minimize_text_of_body ~coqbot_resume_ci_minimize_text_of_body
+  | "/coq-bug-minimizer" | "/ci-minimization" | "/resume-ci-minimization" ->
+      Webhook_minimizer.handle_minimizer_webhook ~bot_info ~key ~app_id
+        ~endpoint:path ~body
+  | "/check-stale-pr" ->
+      Webhook_scheduled.handle_stale_pr_check ~bot_info ~key ~app_id
+        ~daily_schedule_secret ~body
+>>>>>>> 5bfc5ef (chore: refactor the code inside bot and make it more specific handler modules instead of a large monolithic file)
   | _ ->
       Server.respond_not_found ()
 

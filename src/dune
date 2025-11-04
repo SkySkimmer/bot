@@ -2,7 +2,9 @@
  (name botlib)
  (libraries base bot-components cohttp-lwt-unix mirage-crypto
    mirage-crypto-rng mirage-crypto-rng-lwt stdio toml yojson)
- (modules :standard \ bot)
+ (modules :standard \ bot webhook_gitlab webhook_github webhook_minimizer
+   webhook_scheduled)
+ (wrapped false)
  (inline_tests)
  (preprocess
   (pps ppx_expect)))
@@ -11,7 +13,8 @@
  (name bot)
  (public_name bot)
  (package coq-bot)
- (modules bot)
+ (modules bot webhook_gitlab webhook_github webhook_minimizer
+   webhook_scheduled)
  (promote (until-clean))
  (libraries botlib))
 
