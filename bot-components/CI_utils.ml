@@ -3,7 +3,7 @@ open GitLab_types
 open Utils
 
 (******************************************************************************)
-(* Pipeline Summary and Error Formatting                                     *)
+(* Pipeline Summary and Error Formatting                                      *)
 (******************************************************************************)
 
 let create_pipeline_summary ?summary_top pipeline_info pipeline_url =

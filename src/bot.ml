@@ -43,10 +43,6 @@ let bot_info : Bot_components.Bot_info.t =
 
 let github_mapping, gitlab_mapping = Config.make_mappings_table toml_data
 
-let string_of_installation_tokens =
-  Hashtbl.fold ~init:"" ~f:(fun ~key ~data acc ->
-      acc ^ f "Owner: %s, token: %s,  expire at: %f\n" key (fst data) (snd data) )
-
 (* TODO: deprecate unsigned webhooks *)
 
 let callback _conn req body =

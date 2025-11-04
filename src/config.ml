@@ -115,35 +115,6 @@ let github_private_key () =
   | Error (`Msg e) ->
       failwith (f "Error while decoding RSA key: %s" e)
 
-let parse_mappings mappings =
-  let assoc =
-    list_table_keys mappings
-    |> List.map ~f:(fun k ->
-           match
-             (subkey_value mappings k "github", subkey_value mappings k "gitlab")
-           with
-           | Some gh, Some gl ->
-               let gl_domain =
-                 subkey_value mappings k "gitlab_domain"
-                 |> Option.value ~default:"gitlab.com"
-               in
-               (gh, (gl_domain, gl))
-           | _, _ ->
-               failwith (f "Missing github or gitlab key for mappings.%s" k) )
-  in
-  let assoc_rev =
-    List.map assoc ~f:(fun (gh, (gl_domain, gl)) -> (gl_domain ^ "/" ^ gl, gh))
-  in
-  let get_table t =
-    match t with
-    | `Duplicate_key _ ->
-        raise (Failure "Duplicate key in config.")
-    | `Ok t ->
-        t
-  in
-  ( get_table (Hashtbl.of_alist (module String) assoc)
-  , get_table (Hashtbl.of_alist (module String) assoc_rev) )
-
 let make_mappings_table toml_data =
   try
     match find "mappings" toml_data with

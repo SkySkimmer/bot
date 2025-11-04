@@ -19,3 +19,7 @@ val format_options_for_getopts : string -> string
 val getopts : string -> opt:string -> string list
 
 val getopt : string -> opt:string -> string
+
+val parse_mappings :
+     Toml.Types.table
+  -> (string, string * string) Base.Hashtbl.t * (string, string) Base.Hashtbl.t

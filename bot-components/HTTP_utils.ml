@@ -8,9 +8,9 @@ open Lwt.Syntax
 open Zip
 open Utils
 
-(* ========================================================================== *)
-(* Header Management *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Header Management                                                          *)
+(******************************************************************************)
 
 let headers header_list user_agent =
   Header.init ()
@@ -32,9 +32,9 @@ let app_api_preview_header =
 
 let api_json_header = [("Accept", "application/vnd.github+json")]
 
-(* ========================================================================== *)
-(* HTTP Client Operations *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* HTTP Client Operations                                                     *)
+(******************************************************************************)
 
 (* when following a redirect from GitHub to Azure, passing along the
    Authorization header results in 403 Forbidden.  So we strip the
@@ -90,9 +90,9 @@ let send_request ~body ~uri header_list user_agent =
   let headers = headers header_list user_agent in
   Client.post ~body ~headers uri >>= print_response
 
-(* ========================================================================== *)
-(* Content Handlers *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Content Handlers                                                           *)
+(******************************************************************************)
 
 let handle_json action body =
   try
@@ -129,9 +129,9 @@ let handle_zip action body =
                 Error (f "Zip.Error(%s, %s, %s)" zip_name entry_name message) ) )
   >|= action
 
-(* ========================================================================== *)
-(* GitHub-specific API Functions *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* GitHub-specific API Functions                                              *)
+(******************************************************************************)
 
 let github_get ~bot_info relative_uri ?(header_list = []) handler =
   let open Lwt_result.Infix in
@@ -149,9 +149,9 @@ let github_get_json ~bot_info relative_uri ?(header_list = []) json_handler =
 let github_get_zip ~bot_info relative_uri ?(header_list = []) zip_handler =
   github_get ~bot_info relative_uri ~header_list (handle_zip zip_handler)
 
-(* ========================================================================== *)
-(* Stream and Download Utilities *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Stream and Download Utilities                                              *)
+(******************************************************************************)
 
 let copy_stream ~src ~dst =
   let buffer = Buffer.create 1024 in
@@ -201,7 +201,7 @@ let download_to ~uri chan =
   download_cps ~uri ~with_file:(fun write_to -> write_to chan)
 
 (******************************************************************************)
-(* Artifact Fetching Utilities                                               *)
+(* Artifact Fetching Utilities                                                *)
 (******************************************************************************)
 
 let fetch_artifact url =

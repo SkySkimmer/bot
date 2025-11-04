@@ -68,7 +68,7 @@ type ci_pr_minimization_suggestion =
   | Silent of string
 
 (******************************************************************************)
-(* CI Minimization Parsing Utilities                                         *)
+(* CI Minimization Parsing Utilities                                          *)
 (******************************************************************************)
 
 let parse_quantity table table_name =
@@ -117,7 +117,7 @@ let run_ci_minimization_error_to_string = function
          %s"
         url error
 (******************************************************************************)
-(* GitHub Artifact Parsing                                                   *)
+(* GitHub Artifact Parsing                                                    *)
 (******************************************************************************)
 
 let parse_github_artifact_url url =
@@ -135,7 +135,7 @@ let parse_github_artifact_url url =
   else None
 
 (******************************************************************************)
-(* CI Minimization Core Functions                                            *)
+(* CI Minimization Core Functions                                             *)
 (******************************************************************************)
 
 (* For grammatical correctness, all messages are expected to follow "because" *)

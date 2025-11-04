@@ -1,8 +1,8 @@
 open Base
 
-(* ========================================================================== *)
-(* Regex/Pattern Matching Functions *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Regex/Pattern Matching Functions                                           *)
+(******************************************************************************)
 
 let string_match ~regexp ?(pos = 0) string =
   try
@@ -38,9 +38,9 @@ let find_all_regex_in_lines ~regexps lines =
           if string_match ~regexp line then Some (Str.matched_group 1 line)
           else None ) )
 
-(* ========================================================================== *)
-(* String Extraction and Manipulation *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* String Extraction and Manipulation                                         *)
+(******************************************************************************)
 
 let first_line_of_string s =
   if string_match ~regexp:"\\(.*\\)\n" s then Str.matched_group 1 s else s
@@ -48,9 +48,9 @@ let first_line_of_string s =
 let remove_between s i j =
   String.sub ~pos:0 ~len:i s ^ String.sub s ~pos:j ~len:(String.length s - j)
 
-(* ========================================================================== *)
-(* Formatting Functions *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Formatting Functions                                                       *)
+(******************************************************************************)
 
 let code_wrap str = Printf.sprintf "```\n%s\n```" str
 
@@ -60,9 +60,9 @@ let markdown_details summary text =
 
 let markdown_link text url = Printf.sprintf "[%s](%s)" text url
 
-(* ========================================================================== *)
-(* HTML/Comment Processing *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* HTML/Comment Processing                                                    *)
+(******************************************************************************)
 
 let trim_comments comment =
   let rec aux comment begin_ in_comment =
@@ -79,9 +79,9 @@ let trim_comments comment =
   in
   aux comment 0 false
 
-(* ========================================================================== *)
-(* Bot-specific String Processing *)
-(* ========================================================================== *)
+(******************************************************************************)
+(* Bot-specific String Processing                                             *)
+(******************************************************************************)
 
 let strip_quoted_bot_name ~github_bot_name body =
   (* If someone says "`@coqbot minimize foo`", (with backticks), we
@@ -116,9 +116,9 @@ let shorten_ci_check_name target =
   |> Str.global_replace (Str.regexp "(branch)") ""
   |> Stdlib.String.trim
 
-(* ========================================================================== *)
+(******************************************************************************)
 (* Hashtable Formatting                                                       *)
-(* ========================================================================== *)
+(******************************************************************************)
 
 let string_of_mapping mapping =
   Hashtbl.fold ~init:""

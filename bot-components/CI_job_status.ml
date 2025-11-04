@@ -195,7 +195,7 @@ let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
             Lwt_io.printf "No repo id: %s\n" e )
 
 (******************************************************************************)
-(* GitLab Trace Processing Utilities                                         *)
+(* GitLab Trace Processing Utilities                                          *)
 (******************************************************************************)
 
 let trace_action ~repo_full_name trace =

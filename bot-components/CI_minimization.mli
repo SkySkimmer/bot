@@ -63,7 +63,7 @@ type ci_pr_minimization_suggestion =
   | Silent of string
 
 (******************************************************************************)
-(* CI Minimization Parsing Utilities                                         *)
+(* CI Minimization Parsing Utilities                                          *)
 (******************************************************************************)
 
 val parse_quantity : string -> string -> (int, string) Result.t Lwt.t
@@ -73,12 +73,12 @@ val accumulate_extra_minimizer_arguments : string -> string list Lwt.t
 val run_ci_minimization_error_to_string : run_ci_minimization_error -> string
 
 (******************************************************************************)
-(* GitHub Artifact Parsing                                                   *)
+(* GitHub Artifact Parsing                                                    *)
 (******************************************************************************)
 
 val parse_github_artifact_url : string -> artifact_info option
 (******************************************************************************)
-(* CI Minimization Core Functions                                            *)
+(* CI Minimization Core Functions                                             *)
 (******************************************************************************)
 
 val run_ci_minimization :
