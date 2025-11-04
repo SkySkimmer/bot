@@ -104,18 +104,6 @@ let clean_gitlab_trace trace =
   |> Str.global_replace (Str.regexp "section_end:[0-9]*:[a-z_]*\r") ""
   |> String.split_lines
 
-let find_regex_in_lines ~regexps lines =
-  List.find_map lines ~f:(fun line ->
-      List.find_map regexps ~f:(fun regexp ->
-          if string_match ~regexp line then Some (Str.matched_group 1 line)
-          else None ) )
-
-let find_all_regex_in_lines ~regexps lines =
-  List.filter_map lines ~f:(fun line ->
-      List.find_map regexps ~f:(fun regexp ->
-          if string_match ~regexp line then Some (Str.matched_group 1 line)
-          else None ) )
-
 let trace_action ~repo_full_name trace =
   trace |> String.length
   |> Lwt_io.printlf "Trace size: %d."
@@ -238,21 +226,9 @@ let shorten_ci_check_name target =
   |> Str.global_replace (Str.regexp "(branch)") ""
   |> Stdlib.String.trim
 
-let format_options_for_getopts options =
-  " " ^ options ^ " " |> Str.global_replace (Str.regexp "[\n\r\t]") " "
-
-let getopts options ~opt =
-  map_string_matches
-    ~regexp:(f " %s\\(\\.\\|[ =:-]\\|: \\)\\([^ ]+\\) " opt)
-    ~f:(fun () -> Str.matched_group 2 options)
-    options
-
-let getopt options ~opt =
-  options |> getopts ~opt |> List.hd |> Option.value ~default:""
-
 let accumulate_extra_minimizer_arguments options =
-  let extra_args = getopts ~opt:"extra-arg" options in
-  let inline_stdlib = getopt ~opt:"inline-stdlib" options in
+  let extra_args = Utils.getopts ~opt:"extra-arg" options in
+  let inline_stdlib = Utils.getopt ~opt:"inline-stdlib" options in
   ( if String.equal inline_stdlib "yes" then Lwt.return ["--inline-coqlib"]
     else
       ( if not (String.equal inline_stdlib "") then

@@ -515,9 +515,9 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
 
 let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
     ~owner ~repo ~options =
-  let options = CI_utils.format_options_for_getopts options in
+  let options = Utils.format_options_for_getopts options in
   let getopt_version opt =
-    options |> CI_utils.getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
+    options |> Utils.getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
   in
   CI_utils.accumulate_extra_minimizer_arguments options
   >>= fun minimizer_extra_arguments ->

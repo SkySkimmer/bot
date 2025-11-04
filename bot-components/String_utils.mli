@@ -4,6 +4,10 @@
 
 val string_match : regexp:string -> ?pos:int -> string -> bool
 
+val find_regex_in_lines : regexps:string list -> string list -> string option
+
+val find_all_regex_in_lines : regexps:string list -> string list -> string list
+
 val fold_string_matches :
   regexp:string -> f:((unit -> 'a) -> 'a) -> init:'a -> ?pos:int -> string -> 'a
 

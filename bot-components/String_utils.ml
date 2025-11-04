@@ -1,5 +1,4 @@
 open Base
-open Utils
 
 (* ========================================================================== *)
 (* Regex/Pattern Matching Functions *)
@@ -27,6 +26,18 @@ let map_string_matches ~regexp ~f string =
 let iter_string_matches ~regexp ~f string =
   fold_string_matches ~regexp ~f:(fun rest -> f () ; rest ()) ~init:() string
 
+let find_regex_in_lines ~regexps lines =
+  List.find_map lines ~f:(fun line ->
+      List.find_map regexps ~f:(fun regexp ->
+          if string_match ~regexp line then Some (Str.matched_group 1 line)
+          else None ) )
+
+let find_all_regex_in_lines ~regexps lines =
+  List.filter_map lines ~f:(fun line ->
+      List.find_map regexps ~f:(fun regexp ->
+          if string_match ~regexp line then Some (Str.matched_group 1 line)
+          else None ) )
+
 (* ========================================================================== *)
 (* String Extraction and Manipulation *)
 (* ========================================================================== *)
@@ -41,12 +52,13 @@ let remove_between s i j =
 (* Formatting Functions *)
 (* ========================================================================== *)
 
-let code_wrap str = f "```\n%s\n```" str
+let code_wrap str = Printf.sprintf "```\n%s\n```" str
 
 let markdown_details summary text =
-  f "<details>\n<summary>%s</summary>\n\n%s\n\n</details>\n" summary text
+  Printf.sprintf "<details>\n<summary>%s</summary>\n\n%s\n\n</details>\n"
+    summary text
 
-let markdown_link text url = f "[%s](%s)" text url
+let markdown_link text url = Printf.sprintf "[%s](%s)" text url
 
 (* ========================================================================== *)
 (* HTML/Comment Processing *)
@@ -77,8 +89,9 @@ let strip_quoted_bot_name ~github_bot_name body =
      the tagging to "@`coqbot minimize foo`" so that the matching
      below doesn't pick up the name *)
   Str.global_replace
-    (Str.regexp (f "\\(`\\|<code>\\)@%s:? " @@ Str.quote github_bot_name))
-    (f "@\\1%s " @@ Str.quote github_bot_name)
+    (Str.regexp
+       (Printf.sprintf "\\(`\\|<code>\\)@%s:? " (Str.quote github_bot_name)) )
+    (Printf.sprintf "@\\1%s " (Str.quote github_bot_name))
     body
 
 let%expect_test "strip_quoted_bot_name" =

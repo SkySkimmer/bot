@@ -87,10 +87,6 @@ type ci_pr_minimization_suggestion =
 
 val clean_gitlab_trace : string -> string list
 
-val find_regex_in_lines : regexps:string list -> string list -> string option
-
-val find_all_regex_in_lines : regexps:string list -> string list -> string list
-
 val trace_action : repo_full_name:string -> string -> build_failure Lwt.t
 
 (******************************************************************************)
@@ -109,12 +105,6 @@ val run_ci_minimization_error_to_string : run_ci_minimization_error -> string
 val parse_quantity : string -> string -> (int, string) Result.t Lwt.t
 
 val shorten_ci_check_name : string -> string
-
-val format_options_for_getopts : string -> string
-
-val getopts : string -> opt:string -> string list
-
-val getopt : string -> opt:string -> string
 
 val accumulate_extra_minimizer_arguments : string -> string list Lwt.t
 

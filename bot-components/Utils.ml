@@ -21,3 +21,15 @@ let rec apply_throttle len action args =
     >>= fun ans ->
     let n = List.count ~f:(fun b -> b) ans in
     apply_throttle (len - n) action rem
+
+let format_options_for_getopts options =
+  " " ^ options ^ " " |> Str.global_replace (Str.regexp "[\n\r\t]") " "
+
+let getopts options ~opt =
+  String_utils.map_string_matches
+    ~regexp:(f " %s\\(\\.\\|[ =:-]\\|: \\)\\([^ ]+\\) " opt)
+    ~f:(fun () -> Str.matched_group 2 options)
+    options
+
+let getopt options ~opt =
+  options |> getopts ~opt |> List.hd |> Option.value ~default:""
