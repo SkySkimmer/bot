@@ -152,7 +152,7 @@ let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
             when String.equal head.sha
                    (f {|"%s"|} job_info.common_info.head_commit) ->
               GitHub_mutations.post_comment ~bot_info ~id ~message
-              >>= GitHub_mutations.report_on_posting_comment
+              >>= Utils.report_on_posting_comment
           | Ok {head} ->
               Lwt_io.printf
                 "We are on a PR branch but the commit (%s) is not the current \

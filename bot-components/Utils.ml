@@ -1,5 +1,6 @@
 open Base
 open Lwt.Infix
+open GitHub_types
 
 let f = Printf.sprintf
 
@@ -72,3 +73,39 @@ let parse_mappings mappings =
   in
   ( get_table (Hashtbl.of_alist (module String) assoc)
   , get_table (Hashtbl.of_alist (module String) assoc_rev) )
+
+let report_on_posting_comment = function
+  | Ok url ->
+      Lwt_io.printf "Posted a new comment: %s\n" url
+  | Error f ->
+      Lwt_io.printf "Error while posting a comment: %s\n" f
+
+let extract_backport_info ~(bot_info : Bot_info.t) ~description :
+    backport_info list =
+  let main_regexp =
+    "backport to \\([^ ]*\\) (.*move rejected PRs to: "
+    ^ "https://github.com/[^/]*/[^/]*/milestone/\\([0-9]+\\)" ^ ")"
+  in
+  let begin_regexp = bot_info.github_name ^ ": \\(.*\\)$" in
+  let backport_info_unit = main_regexp ^ "; \\(.*\\)$" in
+  let end_regexp = main_regexp in
+  let rec aux description =
+    if String_utils.string_match ~regexp:backport_info_unit description then
+      let backport_to = Str.matched_group 1 description in
+      let rejected_milestone =
+        Str.matched_group 2 description |> Int.of_string
+      in
+      Str.matched_group 3 description
+      |> aux
+      |> List.cons {backport_to; rejected_milestone}
+    else if String_utils.string_match ~regexp:end_regexp description then
+      let backport_to = Str.matched_group 1 description in
+      let rejected_milestone =
+        Str.matched_group 2 description |> Int.of_string
+      in
+      [{backport_to; rejected_milestone}]
+    else []
+  in
+  if String_utils.string_match ~regexp:begin_regexp description then
+    Str.matched_group 1 description |> aux
+  else []

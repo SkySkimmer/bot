@@ -23,3 +23,8 @@ val getopt : string -> opt:string -> string
 val parse_mappings :
      Toml.Types.table
   -> (string, string * string) Base.Hashtbl.t * (string, string) Base.Hashtbl.t
+
+val report_on_posting_comment : (string, string) result -> unit Lwt.t
+
+val extract_backport_info :
+  bot_info:Bot_info.t -> description:string -> GitHub_types.backport_info list

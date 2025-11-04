@@ -443,7 +443,7 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
           "I am not triggering a CI run on this PR because the CI \
            configuration has been modified. CI can be triggered manually by an \
            authorized contributor."
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
       >>= fun () -> Lwt.return_ok () )
     else
       (* In Rocq Prover repo, we have several special cases:
@@ -607,7 +607,7 @@ let pull_request_updated_action ~bot_info
                 By the way, you may be interested in reading [our contributing \
                 guide](https://github.com/rocq-prover/rocq/blob/master/CONTRIBUTING.md)."
                pr_info.base.branch.name )
-        >>= GitHub_mutations.report_on_posting_comment )
+        >>= Utils.report_on_posting_comment )
       |> Lwt.async
   | _ ->
       () ) ;
@@ -648,7 +648,7 @@ let rocq_check_needs_rebase_pr ~bot_info ~owner ~repo ~warn_after ~close_after
                       closed."
                      rebase_label warn_after close_after )
                 ~bot_info
-              >>= GitHub_mutations.report_on_posting_comment
+              >>= Utils.report_on_posting_comment
               >>= fun () ->
               GitHub_mutations.add_labels ~bot_info ~labels:[stale_id]
                 ~issue:pr_id
@@ -672,7 +672,7 @@ let rocq_check_stale_pr ~bot_info ~owner ~repo ~after ~throttle =
             now closed."
            after )
       ~bot_info
-    >>= GitHub_mutations.report_on_posting_comment
+    >>= Utils.report_on_posting_comment
     >>= fun () ->
     GitHub_mutations.close_pull_request ~bot_info ~pr_id
     >>= fun () -> Lwt.return true

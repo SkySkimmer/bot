@@ -292,7 +292,7 @@ let run_bench ~bot_info ?(org = "rocq-prover") ?(team = "contributors")
         ?key_value_pairs ()
   | Error err, _ | _, Error err ->
       GitHub_mutations.post_comment ~bot_info ~message:err ~id:pr.id
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
   | Ok false, _ ->
       (* User not found in the team *)
       GitHub_workflows.inform_user_not_in_contributors ~bot_info ~comment_info

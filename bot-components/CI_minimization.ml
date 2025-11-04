@@ -1245,7 +1245,7 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
           | Some message ->
               GitHub_mutations.post_comment ~id:comment_thread_id ~message
                 ~bot_info
-              >>= GitHub_mutations.report_on_posting_comment
+              >>= Utils.report_on_posting_comment
           | None ->
               Lwt_io.printlf
                 "NOT commenting with CI minimization information at %s/%s@%s \
@@ -1256,7 +1256,7 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
           if comment_on_error then
             GitHub_mutations.post_comment ~id:comment_thread_id ~message
               ~bot_info
-            >>= GitHub_mutations.report_on_posting_comment
+            >>= Utils.report_on_posting_comment
           else
             Lwt_io.printlf "Error while attempting to minimize from PR #%d:\n%s"
               pr_number message )
@@ -1266,7 +1266,7 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
           (f "Error while attempting to find job minimization information:\n%s"
              err )
         ~bot_info
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
   | Error (_, err) ->
       Lwt_io.printlf
         "Error while attempting to find jobs to minimize from PR #%d:\n%s"
@@ -1343,7 +1343,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
               I'll come back to you with the results once it's done."
              comment_author minimizer_url )
         ~bot_info
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
   | Error e ->
       Lwt_io.printf "Error: %s\n" e
       >>= fun () ->
@@ -1354,7 +1354,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
               %s\n\n\
               cc @JasonGross" e )
         ~bot_info
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
 
 let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
   if String_utils.string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
@@ -1368,7 +1368,7 @@ let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
             ~owner
             (GitHub_mutations.post_comment ~id:(GitHub_ID.of_string id)
                ~message:(if ci then message else f "@%s, %s" author message) )
-          >>= GitHub_mutations.report_on_posting_comment
+          >>= Utils.report_on_posting_comment
           <&> ( Git_utils.execute_cmd
                   (* To delete the branch we need to identify as
                      coqbot the GitHub user, who is a collaborator on

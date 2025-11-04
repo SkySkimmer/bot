@@ -84,12 +84,6 @@ let post_comment ~bot_info ~id ~message =
         | _ ->
             Error "Error while retrieving URL of posted comment." )
 
-let report_on_posting_comment = function
-  | Ok url ->
-      Lwt_io.printf "Posted a new comment: %s\n" url
-  | Error f ->
-      Lwt_io.printf "Error while posting a comment: %s\n" f
-
 let update_milestone_issue ~bot_info ~issue ~milestone =
   let open GitHub_GraphQL.UpdateMilestoneIssue in
   makeVariables
@@ -156,28 +150,9 @@ let merge_pull_request ~bot_info ?merge_method ?commit_headline ?commit_body
   | Error err ->
       Lwt_io.printlf "Error while merging PR: %s" err
 
-let string_of_conclusion conclusion =
-  match conclusion with
-  | ACTION_REQUIRED ->
-      `ACTION_REQUIRED
-  | CANCELLED ->
-      `CANCELLED
-  | FAILURE ->
-      `FAILURE
-  | NEUTRAL ->
-      `NEUTRAL
-  | SKIPPED ->
-      `SKIPPED
-  | STALE ->
-      `STALE
-  | SUCCESS ->
-      `SUCCESS
-  | TIMED_OUT ->
-      `TIMED_OUT
-
 let create_check_run ~bot_info ?conclusion ~name ~repo_id ~head_sha ~status
     ~details_url ~title ?text ~summary ?external_id () =
-  let conclusion = Option.map conclusion ~f:string_of_conclusion in
+  let conclusion = Option.map conclusion ~f:String_utils.string_of_conclusion in
   let status =
     match status with
     | COMPLETED ->
@@ -218,7 +193,7 @@ let create_check_run ~bot_info ?conclusion ~name ~repo_id ~head_sha ~status
 
 let update_check_run ~bot_info ~check_run_id ~repo_id ~conclusion ?details_url
     ~title ?text ~summary () =
-  let conclusion = string_of_conclusion conclusion in
+  let conclusion = String_utils.string_of_conclusion conclusion in
   let open GitHub_GraphQL.UpdateCheckRun in
   makeVariables
     ~checkRunId:(GitHub_ID.to_string check_run_id)

@@ -140,7 +140,7 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
                                comment_info.author
                                (List.fold_left overlays ~init:"" ~f:(fun s o ->
                                     s ^ f "- %s\n" o ) ) )
-                        >>= GitHub_mutations.report_on_posting_comment
+                        >>= Utils.report_on_posting_comment
                         >>= fun () -> Lwt.return_ok () )
                 | Error e ->
                     Lwt.return_error
@@ -157,7 +157,7 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
       Lwt.return_unit
   | Error err ->
       GitHub_mutations.post_comment ~bot_info ~message:err ~id:pr.id
-      >>= GitHub_mutations.report_on_posting_comment
+      >>= Utils.report_on_posting_comment
 
 let reflect_pull_request_milestone ~bot_info pr_closer_info =
   match pr_closer_info.closer.milestone_id with
@@ -179,7 +179,7 @@ let reflect_pull_request_milestone ~bot_info pr_closer_info =
                 ~message:
                   "The milestone of this issue was changed to reflect the one \
                    of the pull request that closed it."
-            >>= GitHub_mutations.report_on_posting_comment ) )
+            >>= Utils.report_on_posting_comment ) )
 
 let rec adjust_milestone ~bot_info ~issue ~sleep_time =
   (* We implement an exponential backoff strategy to try again after
@@ -243,7 +243,7 @@ let project_action ~bot_info ~pr_id ~backport_to () =
                       "This PR was postponed. Please update accordingly the \
                        milestone of any issue that this fixes as this cannot \
                        be done automatically."
-                >>= GitHub_mutations.report_on_posting_comment )
+                >>= Utils.report_on_posting_comment )
         | Error err ->
             Lwt_io.printlf "Error while obtaining milestone ID: %s" err ) )
 
@@ -389,4 +389,4 @@ let inform_user_not_in_contributors ~bot_info ~comment_info =
           `@rocq-prover/contributors` team. If you are a regular contributor, \
           you can request to join the team by asking any core developer."
          comment_info.author )
-  >>= GitHub_mutations.report_on_posting_comment
+  >>= Utils.report_on_posting_comment
