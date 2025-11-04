@@ -3,6 +3,9 @@ open Cohttp
 open Cohttp_lwt_unix
 open Lwt.Infix
 open Bot_components
+open Bot_components.CI_minimization
+open Bot_components.CI_job_status
+open Bot_components.Bench_utils
 open Botlib
 open Actions
 open Github_installations
@@ -90,7 +93,11 @@ let callback _conn req body =
         | Ok (owner, _) ->
             (fun () ->
               action_as_github_app ~bot_info ~key ~app_id ~owner
-                (pipeline_action ~gitlab_mapping pipeline_info) )
+                (fun ~bot_info ->
+                  pipeline_action ~bot_info pipeline_info ~gitlab_mapping
+                    ~full_ci_check_repo:(Some ("rocq-prover", "rocq"))
+                    ~auto_minimize_on_failure:(Some ("rocq-prover", "rocq"))
+                    () ) )
             |> Lwt.async ;
             Server.respond_string ~status:`OK ~body:"Pipeline event." () )
       | Ok (_, UnsupportedEvent e) ->
@@ -198,8 +205,9 @@ let callback _conn req body =
             >>= fun () ->
             action_as_github_app ~bot_info ~key ~app_id
               ~owner:pr_info.issue.issue.owner
-              (pull_request_closed_action ~gitlab_mapping ~github_mapping
-                 pr_info ) )
+              (GitHub_mutations.pull_request_closed_action pr_info
+                 ~gitlab_mapping ~github_mapping
+                 ~remove_milestone_if_not_merged:true ) )
           |> Lwt.async ;
           Server.respond_string ~status:`OK
             ~body:
@@ -265,11 +273,15 @@ let callback _conn req body =
                 init_git_bare_repository ~bot_info
                 >>= fun () ->
                 action_as_github_app ~bot_info ~key ~app_id
-                  ~owner:issue_info.issue.owner
-                  (run_coq_minimizer ~script ~comment_thread_id:issue_info.id
-                     ~comment_author:issue_info.user
-                     ~owner:issue_info.issue.owner ~repo:issue_info.issue.repo
-                     ~options ) )
+                  ~owner:issue_info.issue.owner (fun ~bot_info ->
+                    CI_minimization.run_coq_minimizer ~bot_info ~script
+                      ~comment_thread_id:issue_info.id
+                      ~comment_author:issue_info.user
+                      ~owner:issue_info.issue.owner ~repo:issue_info.issue.repo
+                      ~options
+                      ~minimizer_url:
+                        "https://github.com/rocq-community/run-coq-bug-minimizer/actions" )
+                )
               |> Lwt.async ;
               Server.respond_string ~status:`OK ~body:"Handling minimization."
                 ()
@@ -288,12 +300,15 @@ let callback _conn req body =
                 init_git_bare_repository ~bot_info
                 >>= fun () ->
                 action_as_github_app ~bot_info ~key ~app_id
-                  ~owner:comment_info.issue.issue.owner
-                  (run_coq_minimizer ~script
-                     ~comment_thread_id:comment_info.issue.id
-                     ~comment_author:comment_info.author
-                     ~owner:comment_info.issue.issue.owner
-                     ~repo:comment_info.issue.issue.repo ~options ) )
+                  ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                    CI_minimization.run_coq_minimizer ~bot_info ~script
+                      ~comment_thread_id:comment_info.issue.id
+                      ~comment_author:comment_info.author
+                      ~owner:comment_info.issue.issue.owner
+                      ~repo:comment_info.issue.issue.repo ~options
+                      ~minimizer_url:
+                        "https://github.com/rocq-community/run-coq-bug-minimizer/actions" )
+                )
               |> Lwt.async ;
               Server.respond_string ~status:`OK ~body:"Handling minimization."
                 ()
@@ -308,9 +323,10 @@ let callback _conn req body =
                   init_git_bare_repository ~bot_info
                   >>= fun () ->
                   action_as_github_app ~bot_info ~key ~app_id
-                    ~owner:comment_info.issue.issue.owner
-                    (ci_minimize ~comment_info ~requests ~comment_on_error:true
-                       ~options ~bug_file:(Some bug_file) ) )
+                    ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                      ci_minimize ~bot_info ~comment_info ~requests
+                        ~comment_on_error:true ~options ~bug_file:(Some bug_file) )
+                  )
                 |> Lwt.async ;
                 Server.respond_string ~status:`OK
                   ~body:"Handling CI minimization resumption." ()
@@ -321,9 +337,9 @@ let callback _conn req body =
                     init_git_bare_repository ~bot_info
                     >>= fun () ->
                     action_as_github_app ~bot_info ~key ~app_id
-                      ~owner:comment_info.issue.issue.owner
-                      (ci_minimize ~comment_info ~requests
-                         ~comment_on_error:true ~options ~bug_file:None ) )
+                      ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                        ci_minimize ~bot_info ~comment_info ~requests
+                          ~comment_on_error:true ~options ~bug_file:None ) )
                   |> Lwt.async ;
                   Server.respond_string ~status:`OK
                     ~body:"Handling CI minimization." ()
@@ -387,10 +403,10 @@ let callback _conn req body =
                   then (
                     (fun () ->
                       action_as_github_app ~bot_info ~key ~app_id
-                        ~owner:comment_info.issue.issue.owner
-                        (run_bench
-                           ~key_value_pairs:[("coq_native", "yes")]
-                           comment_info ) )
+                        ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                          run_bench ~bot_info
+                            ~key_value_pairs:[("coq_native", "yes")]
+                            comment_info ) )
                     |> Lwt.async ;
                     Server.respond_string ~status:`OK
                       ~body:(f "Received a request to start the bench.")
@@ -406,8 +422,8 @@ let callback _conn req body =
                   then (
                     (fun () ->
                       action_as_github_app ~bot_info ~key ~app_id
-                        ~owner:comment_info.issue.issue.owner
-                        (run_bench comment_info) )
+                        ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                          run_bench ~bot_info comment_info ) )
                     |> Lwt.async ;
                     Server.respond_string ~status:`OK
                       ~body:(f "Received a request to start the bench.")
@@ -471,8 +487,8 @@ let callback _conn req body =
   | "/resume-ci-minimization" ->
       body
       >>= fun body ->
-      coq_bug_minimizer_resume_ci_minimization_action body ~bot_info ~key
-        ~app_id
+      CI_minimization.coq_bug_minimizer_resume_ci_minimization_action body
+        ~bot_info ~key ~app_id
   | "/check-stale-pr" -> (
       body
       >>= fun body ->

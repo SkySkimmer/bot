@@ -297,3 +297,61 @@ let github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url =
   |> Result.map ~f:(fun (gitlab_domain, gitlab_repo_full_name) ->
          github_repo_of_gitlab_project_path ~gitlab_mapping ~gitlab_domain
            ~gitlab_repo_full_name )
+
+(* TODO: ensure there's no race condition for 2 push with very close timestamps *)
+let mirror_action ~bot_info ?(force = true) ~gitlab_domain ~gh_owner ~gh_repo
+    ~gl_owner ~gl_repo ~base_ref ~head_sha () =
+  (let open Lwt_result.Infix in
+   let local_ref = base_ref ^ "-" ^ head_sha in
+   let gh_ref =
+     {repo_url= f "https://github.com/%s/%s" gh_owner gh_repo; name= base_ref}
+   in
+   (* TODO: generalize to use repository mappings, with enhanced security *)
+   gitlab_repo ~bot_info ~gitlab_domain
+     ~gitlab_full_name:(gl_owner ^ "/" ^ gl_repo)
+   |> Lwt.return
+   >>= fun gl_repo ->
+   let gl_ref = {repo_url= gl_repo; name= base_ref} in
+   git_fetch gh_ref local_ref |> execute_cmd
+   >>= fun () -> git_push ~force ~remote_ref:gl_ref ~local_ref () |> execute_cmd
+  )
+  >>= function
+  | Ok () ->
+      Lwt.return_unit
+  | Error e ->
+      Lwt_io.printlf
+        "Error while mirroring branch/tag %s of repository %s/%s: %s" base_ref
+        gh_owner gh_repo e
+
+let apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
+    =
+  GitHub_queries.get_open_pull_requests_with_label ~bot_info ~owner ~repo ~label
+  >>= function
+  | Ok prs ->
+      let iter (pr_id, pr_number) =
+        GitHub_queries.get_pull_request_label_timeline ~bot_info ~owner ~repo
+          ~pr_number
+        >>= function
+        | Ok timeline ->
+            let find (set, name, ts) =
+              if set && String.equal name label then Some ts else None
+            in
+            (* Look for most recent label setting *)
+            let timeline = List.rev timeline in
+            let days =
+              match List.find_map ~f:find timeline with
+              | None ->
+                  (* even with a race condition it cannot happen *)
+                  failwith
+                    (f {|Anomaly: Label "%s" absent from timeline of PR #%i|}
+                       label pr_number )
+              | Some ts ->
+                  Utils.days_elapsed ts
+            in
+            if days >= after then action pr_id pr_number else Lwt.return false
+        | Error e ->
+            Lwt_io.print (f "Error: %s\n" e) >>= fun () -> Lwt.return false
+      in
+      Utils.apply_throttle throttle iter prs
+  | Error err ->
+      Lwt_io.print (f "Error: %s\n" err)

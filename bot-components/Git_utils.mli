@@ -86,3 +86,27 @@ val github_repo_of_gitlab_url :
      gitlab_mapping:(string, string) Base.Hashtbl.t
   -> http_repo_url:string
   -> (string * string, string) result
+
+val mirror_action :
+     bot_info:Bot_info.t
+  -> ?force:bool
+  -> gitlab_domain:string
+  -> gh_owner:string
+  -> gh_repo:string
+  -> gl_owner:string
+  -> gl_repo:string
+  -> base_ref:string
+  -> head_sha:string
+  -> unit
+  -> unit Lwt.t
+
+val apply_after_label :
+     bot_info:Bot_info.t
+  -> owner:string
+  -> repo:string
+  -> after:int
+  -> label:string
+  -> action:(GitHub_ID.t -> int -> bool Lwt.t)
+  -> throttle:int
+  -> unit
+  -> unit Lwt.t

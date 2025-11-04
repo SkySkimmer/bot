@@ -4,6 +4,7 @@ open GitHub_types
 open GitLab_types
 open Utils
 open String_utils
+open Git_utils
 open Lwt.Infix
 open Lwt.Syntax
 
@@ -352,3 +353,150 @@ let job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info
       Lwt.return_unit
   | Error e ->
       Lwt_io.printf "%s\n" e
+
+let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
+    ~gitlab_mapping ?(full_ci_check_repo = None)
+    ?(auto_minimize_on_failure = None) () =
+  let pr_number, _ = pr_from_branch pipeline_info.common_info.branch in
+  match pipeline_info.state with
+  | "skipped" ->
+      Lwt.return_unit
+  | _ -> (
+      let pipeline_url =
+        f "%s/-/pipelines/%d" http_repo_url pipeline_info.pipeline_id
+      in
+      let external_id =
+        f "%s,projects/%d/pipelines/%d" http_repo_url
+          pipeline_info.common_info.project_id pipeline_info.pipeline_id
+      in
+      match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+      | Error err ->
+          Lwt_io.printlf "Error in pipeline action: %s" err
+      | Ok (gh_owner, gh_repo) -> (
+          let state, status, conclusion, title, summary_top =
+            (* Check if this repo should have full CI detection *)
+            let full_ci =
+              match full_ci_check_repo with
+              | Some (check_owner, check_repo)
+                when String.equal check_owner gh_owner
+                     && String.equal check_repo gh_repo -> (
+                try
+                  List.find_map
+                    ~f:(fun (key, value) ->
+                      if String.equal key "FULL_CI" then
+                        Some (Bool.of_string value)
+                      else None )
+                    pipeline_info.variables
+                with _ -> None )
+              | _ ->
+                  None
+            in
+            let qualified_pipeline =
+              match full_ci with
+              | Some true ->
+                  "Full pipeline"
+              | Some false ->
+                  "Light pipeline"
+              | None ->
+                  "Pipeline"
+            in
+            match pipeline_info.state with
+            | "pending" ->
+                ( "pending"
+                , QUEUED
+                , None
+                , f "%s is pending on GitLab CI" qualified_pipeline
+                , None )
+            | "running" ->
+                ( "pending"
+                , IN_PROGRESS
+                , None
+                , f "%s is running on GitLab CI" qualified_pipeline
+                , None )
+            | "success" ->
+                ( "success"
+                , COMPLETED
+                , Some
+                    ( match full_ci with
+                    | Some false ->
+                        NEUTRAL
+                    | Some true | None ->
+                        SUCCESS )
+                , f "%s completed successfully on GitLab CI" qualified_pipeline
+                , None )
+            | "failed" ->
+                ( "failure"
+                , COMPLETED
+                , Some FAILURE
+                , f "%s completed with errors on GitLab CI" qualified_pipeline
+                , Some
+                    "*If you need to restart the entire pipeline, you may do \
+                     so directly in the GitHub interface using the \"Re-run\" \
+                     button.*" )
+            | "cancelled" | "canceled" ->
+                ( "error"
+                , COMPLETED
+                , Some CANCELLED
+                , f "%s was cancelled on GitLab CI" qualified_pipeline
+                , None )
+            | s ->
+                ( "error"
+                , COMPLETED
+                , Some FAILURE
+                , "Unknown pipeline status: " ^ s
+                , None )
+          in
+          match bot_info.github_install_token with
+          | None ->
+              GitHub_mutations.send_status_check
+                ~repo_full_name:(gh_owner ^ "/" ^ gh_repo)
+                ~commit:pipeline_info.common_info.head_commit ~state
+                ~url:pipeline_url
+                ~context:
+                  (f "GitLab CI pipeline (%s)"
+                     (pr_from_branch pipeline_info.common_info.branch |> snd) )
+                ~description:title ~bot_info
+          | Some _ -> (
+              GitHub_queries.get_repository_id ~bot_info ~owner:gh_owner
+                ~repo:gh_repo
+              >>= function
+              | Error e ->
+                  Lwt_io.printf "No repo id: %s\n" e
+              | Ok repo_id -> (
+                  let summary =
+                    CI_utils.create_pipeline_summary ?summary_top pipeline_info
+                      pipeline_url
+                  in
+                  GitHub_mutations.create_check_run ~bot_info
+                    ~name:
+                      (f "GitLab CI pipeline (%s)"
+                         (pr_from_branch pipeline_info.common_info.branch |> snd) )
+                    ~repo_id ~head_sha:pipeline_info.common_info.head_commit
+                    ~status ?conclusion ~title ~details_url:pipeline_url
+                    ~summary ~external_id ()
+                  >>= fun _ ->
+                  Lwt_unix.sleep 5.
+                  >>= fun () ->
+                  match
+                    ( auto_minimize_on_failure
+                    , gh_owner
+                    , gh_repo
+                    , pipeline_info.state
+                    , pr_number )
+                  with
+                  | ( Some (min_owner, min_repo)
+                    , owner
+                    , repo
+                    , "failed"
+                    , Some pr_number )
+                    when String.equal owner min_owner
+                         && String.equal repo min_repo ->
+                      CI_minimization.minimize_failed_tests ~bot_info
+                        ~owner:gh_owner ~repo:gh_repo ~pr_number
+                        ~head_pipeline_summary:(Some summary)
+                        ~request:CI_minimization.Auto ~comment_on_error:false
+                        ~options:"" ~bug_file:None
+                        ?base_sha:pipeline_info.common_info.base_commit
+                        ~head_sha:pipeline_info.common_info.head_commit ()
+                  | _ ->
+                      Lwt.return_unit ) ) ) )

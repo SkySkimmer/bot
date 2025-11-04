@@ -40,3 +40,12 @@ val job_success_or_pending :
   -> state:string
   -> external_id:string
   -> unit Lwt.t
+
+val pipeline_action :
+     bot_info:Bot_info.t
+  -> GitLab_types.pipeline_info
+  -> gitlab_mapping:(string, string) Base.Hashtbl.t
+  -> ?full_ci_check_repo:(string * string) option
+  -> ?auto_minimize_on_failure:(string * string) option
+  -> unit
+  -> unit Lwt.t

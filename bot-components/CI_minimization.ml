@@ -3,6 +3,9 @@ open Base
 open Utils
 open Lwt.Infix
 open GitHub_types
+open Cohttp
+open Cohttp_lwt_unix
+open Git_utils
 
 type artifact_info =
   | ArtifactInfo of
@@ -1268,3 +1271,212 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
       Lwt_io.printlf
         "Error while attempting to find jobs to minimize from PR #%d:\n%s"
         pr_number err
+
+let ci_minimize ~bot_info ~comment_info ~requests ~comment_on_error ~options
+    ~bug_file =
+  minimize_failed_tests ~bot_info ~owner:comment_info.issue.issue.owner
+    ~repo:comment_info.issue.issue.repo ~pr_number:comment_info.issue.number
+    ~head_pipeline_summary:None
+    ~request:
+      ( match requests with
+      | [] ->
+          RequestSuggested
+      | ["all"] ->
+          RequestAll
+      | requests ->
+          RequestExplicit requests )
+    ~comment_on_error ~options ~bug_file ()
+
+let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
+    ~owner ~repo ~options ~minimizer_url =
+  let options = Utils.format_options_for_getopts options in
+  let getopt_version opt =
+    options |> Utils.getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
+  in
+  accumulate_extra_minimizer_arguments options
+  >>= fun minimizer_extra_arguments ->
+  let coq_version = getopt_version "[Cc]oq" in
+  let ocaml_version = getopt_version "[Oo][Cc]aml" in
+  Lwt_io.printlf
+    "Parsed options for the bug minimizer at %s/%s@%s from '%s' into \
+     {coq_version: '%s'; ocaml_version: '%s'; minimizer_extra_arguments: '%s'}"
+    owner repo
+    (GitHub_ID.to_string comment_thread_id)
+    options coq_version ocaml_version
+    (String.concat ~sep:" " minimizer_extra_arguments)
+  >>= fun () ->
+  ( match script with
+  | Minimize_parser.MinimizeScript {quote_kind; body} ->
+      if
+        List.mem ~equal:String.equal
+          ["shell"; "sh"; "shell-script"; "bash"; "zsh"]
+          (String.lowercase quote_kind)
+        || String.is_prefix ~prefix:"#!" body
+      then
+        Lwt_io.printlf "Assuming script (quote_kind: %s) is a shell script"
+          quote_kind
+        >>= fun () -> Lwt.return body
+      else
+        Lwt_io.printlf "Assuming script (quote_kind: %s) is a .v file"
+          quote_kind
+        >>= fun () ->
+        let fname = "thebug.v" in
+        Lwt.return
+          (f "#!/usr/bin/env bash\ncat > %s <<'EOF'\n%s\nEOF\ncoqc -q %s" fname
+             body fname )
+  | Minimize_parser.MinimizeAttachment {description; url} ->
+      Lwt.return
+        ( "#!/usr/bin/env bash\n"
+        ^ Stdlib.Filename.quote_command "./handle-web-file.sh" [description; url]
+        ) )
+  >>= fun script ->
+  Git_utils.git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id
+    ~comment_author ~owner ~repo ~coq_version ~ocaml_version
+    ~minimizer_extra_arguments
+  >>= function
+  | Ok () ->
+      (* TODO: change minimizer_url to a link to the particular action run when we can get that information *)
+      GitHub_mutations.post_comment ~id:comment_thread_id
+        ~message:
+          (f
+             "Hey @%s, the coq bug minimizer [is running](%s) your script, \
+              I'll come back to you with the results once it's done."
+             comment_author minimizer_url )
+        ~bot_info
+      >>= GitHub_mutations.report_on_posting_comment
+  | Error e ->
+      Lwt_io.printf "Error: %s\n" e
+      >>= fun () ->
+      GitHub_mutations.post_comment ~id:comment_thread_id
+        ~message:
+          (f
+             "Error encountered when attempting to start the coq bug minimizer:\n\
+              %s\n\n\
+              cc @JasonGross" e )
+        ~bot_info
+      >>= GitHub_mutations.report_on_posting_comment
+
+let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
+  if String_utils.string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
+    let stamp = Str.matched_group 1 body in
+    let message = Str.matched_group 2 body in
+    match Str.split (Str.regexp " ") stamp with
+    | [id; author; repo_name; branch_name; owner; _repo; _ (*pr_number*)]
+    | [id; author; repo_name; branch_name; owner; _repo] ->
+        (fun () ->
+          Github_installations.action_as_github_app ~bot_info ~key ~app_id
+            ~owner
+            (GitHub_mutations.post_comment ~id:(GitHub_ID.of_string id)
+               ~message:(if ci then message else f "@%s, %s" author message) )
+          >>= GitHub_mutations.report_on_posting_comment
+          <&> ( Git_utils.execute_cmd
+                  (* To delete the branch we need to identify as
+                     coqbot the GitHub user, who is a collaborator on
+                     the run-coq-bug-minimizer repo, not coqbot the
+                     GitHub App *)
+                  (f "git push https://%s:%s@github.com/%s.git --delete '%s"
+                     bot_info.github_name bot_info.github_pat repo_name
+                     branch_name )
+              >>= function
+              | Ok () ->
+                  Lwt.return_unit
+              | Error f ->
+                  Lwt_io.printf "Error: %s\n" f ) )
+        |> Lwt.async ;
+        Server.respond_string ~status:`OK ~body:"" ()
+    | _ ->
+        Server.respond_string ~status:(`Code 400) ~body:"Bad request" ()
+  else Server.respond_string ~status:(`Code 400) ~body:"Bad request" ()
+
+let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
+    =
+  if String_utils.string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
+    let stamp = Str.matched_group 1 body in
+    let message = Str.matched_group 2 body in
+    match Str.split (Str.regexp " ") stamp with
+    | [ comment_thread_id
+      ; _author
+      ; _repo_name
+      ; _branch_name
+      ; owner
+      ; repo
+      ; pr_number ] -> (
+        message |> String.split ~on:'\n'
+        |> function
+        | docker_image :: target :: ci_targets_joined :: opam_switch
+          :: failing_urls :: passing_urls :: base :: head
+          :: extra_arguments_joined :: bug_file_lines ->
+            (let minimizer_extra_arguments =
+               String.split ~on:' ' extra_arguments_joined
+             in
+             let ci_targets = String.split ~on:' ' ci_targets_joined in
+             let bug_file_contents = String.concat ~sep:"\n" bug_file_lines in
+             fun () ->
+               init_git_bare_repository ~bot_info
+               >>= fun () ->
+               Github_installations.action_as_github_app ~bot_info ~key ~app_id
+                 ~owner
+                 (run_ci_minimization
+                    ~comment_thread_id:(GitHub_ID.of_string comment_thread_id)
+                    ~owner ~repo ~base ~pr_number ~head
+                    ~minimizer_extra_arguments
+                    ~ci_minimization_infos:
+                      [ { target
+                        ; ci_targets
+                        ; opam_switch
+                        ; failing_urls
+                        ; passing_urls
+                        ; docker_image
+                        ; full_target= target (* dummy value *) } ]
+                    ~bug_file:
+                      (Some
+                         (Minimize_parser.MinimizeScript
+                            {quote_kind= ""; body= bug_file_contents} ) ) )
+               >>= function
+               | Ok ([], []) ->
+                   Lwt_io.printlf
+                     "Somehow no jobs were returned from minimization \
+                      resumption?\n\
+                      %s"
+                     message
+               | Ok (jobs_minimized, jobs_that_could_not_be_minimized) -> (
+                   ( match jobs_minimized with
+                   | [] ->
+                       Lwt.return_unit
+                   | _ ->
+                       Lwt_io.printlf "Resuming minimization of %s"
+                         (jobs_minimized |> String.concat ~sep:", ") )
+                   >>= fun () ->
+                   match
+                     jobs_that_could_not_be_minimized
+                     |> List.map ~f:(fun (job, reason) ->
+                            f "%s because %s" job reason )
+                   with
+                   | [] ->
+                       Lwt.return_unit
+                   | msgs ->
+                       Lwt_io.printlf "Could not resume minimization of %s"
+                         (msgs |> String.concat ~sep:", ") )
+               | Error err ->
+                   Lwt_io.printlf
+                     "Internal error (should not happen because no url was \
+                      passed):\n\
+                      Could not resume minimization of %s for %s/%s#%s:\n\
+                      %s"
+                     target owner repo pr_number
+                     (run_ci_minimization_error_to_string err) )
+            |> Lwt.async ;
+            Server.respond_string ~status:`OK
+              ~body:"Handling CI minimization resumption." ()
+        | _ ->
+            Server.respond_string ~status:(Code.status_of_code 400)
+              ~body:
+                (f
+                   "Error: resume-ci-minimization called without enough \
+                    arguments:\n\
+                    %s"
+                   message )
+              () )
+    | _ ->
+        Server.respond_string ~status:(`Code 400) ~body:"Bad request" ()
+  else Server.respond_string ~status:(`Code 400) ~body:"Bad request" ()

@@ -32,3 +32,12 @@ val update_bench_status :
   -> external_id:string
   -> number:int option
   -> unit Lwt.t
+
+val run_bench :
+     bot_info:Bot_info.t
+  -> ?org:string
+  -> ?team:string
+  -> ?gitlab_domain:string
+  -> ?key_value_pairs:(string * string) list
+  -> GitHub_types.comment_info
+  -> unit Lwt.t

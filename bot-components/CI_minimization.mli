@@ -143,3 +143,38 @@ val minimize_failed_tests :
   -> ?head_sha:string
   -> unit
   -> unit Lwt.t
+
+val ci_minimize :
+     bot_info:Bot_info.t
+  -> comment_info:GitHub_types.comment_info
+  -> requests:string list
+  -> comment_on_error:bool
+  -> options:string
+  -> bug_file:Minimize_parser.minimize_parsed option
+  -> unit Lwt.t
+
+val run_coq_minimizer :
+     bot_info:Bot_info.t
+  -> script:Minimize_parser.minimize_parsed
+  -> comment_thread_id:GitHub_ID.t
+  -> comment_author:string
+  -> owner:string
+  -> repo:string
+  -> options:string
+  -> minimizer_url:string
+  -> unit Lwt.t
+
+val coq_bug_minimizer_results_action :
+     bot_info:Bot_info.t
+  -> ci:bool
+  -> key:Mirage_crypto_pk.Rsa.priv
+  -> app_id:int
+  -> string
+  -> (Cohttp.Response.t * Cohttp_lwt__Body.t) Lwt.t
+
+val coq_bug_minimizer_resume_ci_minimization_action :
+     bot_info:Bot_info.t
+  -> key:Mirage_crypto_pk.Rsa.priv
+  -> app_id:int
+  -> string
+  -> (Cohttp.Response.t * Cohttp_lwt__Body.t) Lwt.t

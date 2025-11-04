@@ -3,7 +3,6 @@ open Bot_components
 open Bot_components.Bot_info
 open Bot_components.GitHub_types
 open Bot_components.GitLab_types
-open Cohttp
 open Cohttp_lwt_unix
 open Git_utils
 open Utils
@@ -58,6 +57,7 @@ let job_action ~bot_info
         | unknown_state ->
             Lwt_io.printlf "Unknown job status: %s" unknown_state ) )
 
+<<<<<<< HEAD
 let ci_minimize ~bot_info ~comment_info ~requests ~comment_on_error ~options
     ~bug_file =
   CI_minimization.minimize_failed_tests ~bot_info
@@ -428,6 +428,8 @@ let mirror_action ~bot_info ?(force = true) ~gitlab_domain ~gh_owner ~gh_repo
         "Error while mirroring branch/tag %s of repository %s/%s: %s" base_ref
         gh_owner gh_repo e
 
+=======
+>>>>>>> 492c70d (chore: move generic functions in actions to bot-components, and call them directly to use in bot)
 (* TODO: ensure there's no race condition for 2 push with very close timestamps *)
 let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
     (pr_info : issue_info pull_request_info) ~gitlab_mapping ~github_mapping =
@@ -638,27 +640,6 @@ let run_ci_action ~bot_info ~comment_info ?full_ci ~gitlab_mapping
          comment_info.author comment_info.issue.issue.owner team )
     ()
 
-let pull_request_closed_action ~bot_info
-    (pr_info : GitHub_types.issue_info GitHub_types.pull_request_info)
-    ~gitlab_mapping ~github_mapping =
-  let open Lwt.Infix in
-  gitlab_ci_ref_for_github_pr ~issue:pr_info.issue.issue ~gitlab_mapping
-    ~github_mapping ~bot_info
-  >>= (function
-        | Ok remote_ref ->
-            git_delete ~remote_ref |> execute_cmd >|= ignore
-        | Error err ->
-            Lwt_io.printlf "Error: %s" err )
-  <&>
-  if not pr_info.merged then
-    Lwt_io.printf
-      "PR was closed without getting merged: remove the milestone.\n"
-    >>= fun () ->
-    GitHub_mutations.remove_milestone pr_info.issue.issue ~bot_info
-  else
-    (* TODO: if PR was merged in master without a milestone, post an alert *)
-    Lwt.return_unit
-
 let pull_request_updated_action ~bot_info
     ~(action : GitHub_types.pull_request_action)
     ~(pr_info : GitHub_types.issue_info GitHub_types.pull_request_info)
@@ -769,39 +750,6 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
   in
   Lwt_list.iter_s commit_action commits_msg
 
-let apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
-    =
-  GitHub_queries.get_open_pull_requests_with_label ~bot_info ~owner ~repo ~label
-  >>= function
-  | Ok prs ->
-      let iter (pr_id, pr_number) =
-        GitHub_queries.get_pull_request_label_timeline ~bot_info ~owner ~repo
-          ~pr_number
-        >>= function
-        | Ok timeline ->
-            let find (set, name, ts) =
-              if set && String.equal name label then Some ts else None
-            in
-            (* Look for most recent label setting *)
-            let timeline = List.rev timeline in
-            let days =
-              match List.find_map ~f:find timeline with
-              | None ->
-                  (* even with a race condition it cannot happen *)
-                  failwith
-                    (f {|Anomaly: Label "%s" absent from timeline of PR #%i|}
-                       label pr_number )
-              | Some ts ->
-                  Utils.days_elapsed ts
-            in
-            if days >= after then action pr_id pr_number else Lwt.return false
-        | Error e ->
-            Lwt_io.print (f "Error: %s\n" e) >>= fun () -> Lwt.return false
-      in
-      Utils.apply_throttle throttle iter prs
-  | Error err ->
-      Lwt_io.print (f "Error: %s\n" err)
-
 let rocq_check_needs_rebase_pr ~bot_info ~owner ~repo ~warn_after ~close_after
     ~throttle =
   let rebase_label = "needs: rebase" in
@@ -856,75 +804,3 @@ let rocq_check_stale_pr ~bot_info ~owner ~repo ~after ~throttle =
     >>= fun () -> Lwt.return true
   in
   apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
-
-let run_bench ~bot_info ?key_value_pairs comment_info =
-  (* Do we want to use this more often? *)
-  let open Lwt.Syntax in
-  let pr = comment_info.issue in
-  let owner = pr.issue.owner in
-  let repo = pr.issue.repo in
-  let pr_number = pr.number in
-  (* We need the GitLab build_id and project_id. Currently there is no good way
-     to query this data so we have to jump through some somewhat useless hoops in
-     order to get our hands on this information. TODO: do this more directly.*)
-  let* gitlab_check_summary =
-    GitHub_queries.get_pull_request_refs ~bot_info ~owner ~repo
-      ~number:pr_number
-    >>= function
-    | Error err ->
-        Lwt.return_error
-          (f
-             "Error while fetching PR refs for %s/%s#%d for running bench job: \
-              %s"
-             owner repo pr_number err )
-    | Ok {base= _; head= {sha= head}} ->
-        let head = Str.global_replace (Str.regexp {|"|}) "" head in
-        GitHub_queries.get_pipeline_summary ~bot_info ~owner ~repo ~head
-  in
-  (* Parsing the summary into (build_id, project_id) *)
-  let* process_summary =
-    match gitlab_check_summary with
-    | Error err ->
-        Lwt.return_error err
-    | Ok summary -> (
-      try
-        let build_id =
-          let regexp =
-            f {|.*%s\([0-9]*\)|}
-              (Str.quote "[bench](https://gitlab.inria.fr/coq/coq/-/jobs/")
-          in
-          ( if String_utils.string_match ~regexp summary then
-              Str.matched_group 1 summary
-            else raise @@ Stdlib.Failure "Could not find GitLab bench job ID" )
-          |> Stdlib.int_of_string
-        in
-        let project_id =
-          let regexp = {|.*GitLab Project ID: \([0-9]*\)|} in
-          ( if String_utils.string_match ~regexp summary then
-              Str.matched_group 1 summary
-            else raise @@ Stdlib.Failure "Could not find GitLab Project ID" )
-          |> Int.of_string
-        in
-        Lwt.return_ok (build_id, project_id)
-      with Stdlib.Failure s ->
-        Lwt.return_error
-          (f
-             "Error while regexing summary for %s/%s#%d for running bench job: \
-              %s"
-             owner repo pr_number s ) )
-  in
-  let* allowed_to_bench =
-    GitHub_queries.get_team_membership ~bot_info ~org:"rocq-prover"
-      ~team:"contributors" ~user:comment_info.author
-  in
-  match (allowed_to_bench, process_summary) with
-  | Ok true, Ok (build_id, project_id) ->
-      (* Permission to bench has been granted *)
-      GitLab_mutations.play_job ~bot_info ~gitlab_domain:"gitlab.inria.fr"
-        ~project_id ~build_id ?key_value_pairs ()
-  | Error err, _ | _, Error err ->
-      GitHub_mutations.post_comment ~bot_info ~message:err ~id:pr.id
-      >>= GitHub_mutations.report_on_posting_comment
-  | Ok false, _ ->
-      (* User not found in the team *)
-      GitHub_mutations.inform_user_not_in_contributors ~bot_info ~comment_info
