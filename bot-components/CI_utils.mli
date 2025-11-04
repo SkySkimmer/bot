@@ -25,16 +25,6 @@ type rocq_job_info =
   ; compiler: string
   ; opam_variant: string }
 
-module BenchResults : sig
-  type t =
-    { summary_table: string
-    ; failures: string
-    ; slow_table: string
-    ; slow_number: int
-    ; fast_table: string
-    ; fast_number: int }
-end
-
 type ci_minimization_info =
   { target: string
   ; full_target: string
@@ -85,8 +75,6 @@ type ci_pr_minimization_suggestion =
 (* GitLab Trace Processing Utilities                                         *)
 (******************************************************************************)
 
-val clean_gitlab_trace : string -> string list
-
 val trace_action : repo_full_name:string -> string -> build_failure Lwt.t
 
 (******************************************************************************)
@@ -104,32 +92,13 @@ val run_ci_minimization_error_to_string : run_ci_minimization_error -> string
 
 val parse_quantity : string -> string -> (int, string) Result.t Lwt.t
 
-val shorten_ci_check_name : string -> string
-
 val accumulate_extra_minimizer_arguments : string -> string list Lwt.t
-
-(******************************************************************************)
-(* CI Job Info and Benchmark Utilities                                       *)
-(******************************************************************************)
-
-val fetch_bench_results :
-     job_info:GitLab_types.ci_common_info GitLab_types.job_info
-  -> unit
-  -> (BenchResults.t, string) Result.t Lwt.t
-
-val bench_text : (BenchResults.t, string) Result.t -> string Lwt.t
 
 (******************************************************************************)
 (* GitHub Artifact Parsing                                                   *)
 (******************************************************************************)
 
 val parse_github_artifact_url : string -> artifact_info option
-
-(******************************************************************************)
-(* Artifact Fetching Utilities                                               *)
-(******************************************************************************)
-
-val fetch_artifact : string -> (string, string) Result.t Lwt.t
 
 (******************************************************************************)
 (* CI Status Check Functions                                                 *)
@@ -148,9 +117,6 @@ val send_status_check :
   -> external_id:string
   -> trace:string
   -> unit Lwt.t
-
-val inform_user_not_in_contributors :
-  bot_info:Bot_info.t -> comment_info:GitHub_types.comment_info -> unit Lwt.t
 
 (******************************************************************************)
 (* CI Minimization Core Functions                                            *)

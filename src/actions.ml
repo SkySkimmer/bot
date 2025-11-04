@@ -84,7 +84,7 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
       Lwt.return_unit
 
 let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
-    (results : (CI_utils.BenchResults.t, string) Result.t) =
+    (results : (Bench_utils.BenchResults.t, string) Result.t) =
   GitHub_queries.get_pull_request_id ~bot_info ~owner ~repo ~number
   >>= function
   | Ok id -> (
@@ -163,8 +163,8 @@ let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
           in
           match state with
           | "success" ->
-              let* results = CI_utils.fetch_bench_results ~job_info () in
-              let* text = CI_utils.bench_text results in
+              let* results = Bench_utils.fetch_bench_results ~job_info () in
+              let* text = Bench_utils.bench_text results in
               let* check_url =
                 create_check_run ~status:COMPLETED ~conclusion:SUCCESS
                   ~title:"Bench completed successfully" ~text ()
@@ -175,8 +175,8 @@ let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
               in
               Lwt.return_unit
           | "failed" ->
-              let* results = CI_utils.fetch_bench_results ~job_info () in
-              let* text = CI_utils.bench_text results in
+              let* results = Bench_utils.fetch_bench_results ~job_info () in
+              let* text = Bench_utils.bench_text results in
               let* check_url =
                 create_check_run ~status:COMPLETED ~conclusion:NEUTRAL
                   ~title:"Bench completed with failures" ~text ()
@@ -1083,7 +1083,8 @@ let run_ci_action ~bot_info ~comment_info ?full_ci ~gitlab_mapping
                    ~bot_info ~gitlab_mapping ~github_mapping
            else
              (* We inform the author of the request that they are not authorized. *)
-             CI_utils.inform_user_not_in_contributors ~bot_info ~comment_info
+             GitHub_mutations.inform_user_not_in_contributors ~bot_info
+               ~comment_info
              |> Lwt_result.ok )
      |> Fn.flip Lwt_result.bind_lwt_error (fun err ->
             Lwt_io.printf "Error: %s\n" err ) )
@@ -1509,4 +1510,4 @@ let run_bench ~bot_info ?key_value_pairs comment_info =
       >>= GitHub_mutations.report_on_posting_comment
   | Ok false, _ ->
       (* User not found in the team *)
-      CI_utils.inform_user_not_in_contributors ~bot_info ~comment_info
+      GitHub_mutations.inform_user_not_in_contributors ~bot_info ~comment_info

@@ -199,3 +199,15 @@ let download ~uri dest =
 
 let download_to ~uri chan =
   download_cps ~uri ~with_file:(fun write_to -> write_to chan)
+
+(******************************************************************************)
+(* Artifact Fetching Utilities                                               *)
+(******************************************************************************)
+
+let fetch_artifact url =
+  url |> Uri.of_string |> Client.get
+  >>= fun (resp, body) ->
+  let status_code = resp |> Response.status |> Code.code_of_status in
+  if Int.equal 200 status_code then
+    body |> Cohttp_lwt.Body.to_string >>= Lwt.return_ok
+  else Lwt.return_error (f "Recieved status %d from %s." status_code url)

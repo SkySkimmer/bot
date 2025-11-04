@@ -100,3 +100,18 @@ let%expect_test "strip_quoted_bot_name" =
        {|>this didn't produce a pipeline for some reason\r\n\r\nI think that this is normal. @herbelin was maybe expecting that adding the `request: full CI` label would trigger a new run immediately, but the semantics is that this label will produce such a full CI run at the next update (next push) of this PR. Cf. the [documentation](https://github.com/coq/coq/blob/master/CONTRIBUTING.md#understanding-automatic-feedback):\r\n\r\n>you can request a full run of the CI by putting the `request: full CI` label before pushing to your PR branch, or by commenting `@coqbot: run full CI` after having pushed. |} ) ;
   [%expect
     {| >this didn't produce a pipeline for some reason\r\n\r\nI think that this is normal. @herbelin was maybe expecting that adding the `request: full CI` label would trigger a new run immediately, but the semantics is that this label will produce such a full CI run at the next update (next push) of this PR. Cf. the [documentation](https://github.com/coq/coq/blob/master/CONTRIBUTING.md#understanding-automatic-feedback):\r\n\r\n>you can request a full run of the CI by putting the `request: full CI` label before pushing to your PR branch, or by commenting @`coqbot run full CI` after having pushed. |}]
+
+let clean_gitlab_trace trace =
+  trace
+  |> Str.global_replace (Str.regexp "\027\\[[0-9;]*m") ""
+  |> Str.global_replace (Str.regexp "\027\\[0K") ""
+  |> Str.global_replace (Str.regexp "section_start:[0-9]*:[a-z_]*\r") ""
+  |> Str.global_replace (Str.regexp "section_end:[0-9]*:[a-z_]*\r") ""
+  |> String.split_lines
+
+let shorten_ci_check_name target =
+  target
+  |> Str.global_replace (Str.regexp "GitLab CI job") ""
+  |> Str.global_replace (Str.regexp "(pull request)") ""
+  |> Str.global_replace (Str.regexp "(branch)") ""
+  |> Stdlib.String.trim
