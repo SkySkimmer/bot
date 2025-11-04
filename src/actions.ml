@@ -83,126 +83,6 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
   | _ ->
       Lwt.return_unit
 
-let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
-    (results : (Bench_utils.BenchResults.t, string) Result.t) =
-  GitHub_queries.get_pull_request_id ~bot_info ~owner ~repo ~number
-  >>= function
-  | Ok id -> (
-    match results with
-    | Ok results -> (
-        [ ":checkered_flag: Bench results:"
-        ; String_utils.code_wrap results.summary_table
-        ; results.failures
-        ; String_utils.markdown_details
-            (f ":turtle: Top %d slow downs" results.slow_number)
-            results.slow_table
-        ; String_utils.markdown_details
-            (f ":rabbit2: Top %d speed ups" results.fast_number)
-            results.fast_table
-        ; "- "
-          ^ String_utils.markdown_link ":chair: GitLab Bench Job" gitlab_url ]
-        @ Option.value_map
-            ~f:(fun x ->
-              [ "- "
-                ^ String_utils.markdown_link
-                    ":spiral_notepad: Bench Check Summary" x ] )
-            ~default:[] check_url
-        |> String.concat ~sep:"\n"
-        |> fun message ->
-        GitHub_mutations.post_comment ~bot_info ~id ~message
-        >>= function
-        | Ok _ ->
-            Lwt.return_unit
-        | Error e ->
-            Lwt_io.printlf "Unable to post bench comment for pr #%d: %s" number
-              e )
-    | Error e ->
-        Lwt_io.printlf "Unable to fetch_results for bench for pr #%d: %s" number
-          e )
-  | Error e ->
-      Lwt_io.printlf "Unable to get_pull_request_id for bench for pr #%d: %s"
-        number e
-
-let update_bench_status ~bot_info job_info (gh_owner, gh_repo) ~external_id
-    ~number =
-  let open Lwt.Syntax in
-  match number with
-  | None ->
-      Lwt_io.printlf "No PR number provided for bench summary so aborting."
-  | Some number -> (
-      GitHub_queries.get_repository_id ~bot_info ~owner:gh_owner ~repo:gh_repo
-      >>= function
-      | Error e ->
-          Lwt_io.printlf "No repo id for bench job: %s" e
-      | Ok repo_id -> (
-          Lwt_io.printl "Pushing status check for bench job."
-          <&>
-          let gitlab_url =
-            f "https://gitlab.inria.fr/coq/coq/-/jobs/%d" job_info.build_id
-          in
-          let summary =
-            f "## GitLab Job URL:\n[GitLab Bench Job](%s)\n" gitlab_url
-          in
-          let state = job_info.build_status in
-          let context = "bench" in
-          let create_check_run ~status ?conclusion ~title ?(text = "") () =
-            GitHub_mutations.create_check_run ~bot_info ~name:context ~status
-              ~repo_id ~head_sha:job_info.common_info.head_commit ?conclusion
-              ~title ~details_url:gitlab_url ~summary ~text ~external_id ()
-            >>= function
-            | Ok url ->
-                let* () =
-                  Lwt_io.printlf "Bench Check Summary updated: %s" url
-                in
-                Lwt.return_some url
-            | Error e ->
-                let* () =
-                  Lwt_io.printlf "Bench Check Summary URL missing: %s" e
-                in
-                Lwt.return_none
-          in
-          match state with
-          | "success" ->
-              let* results = Bench_utils.fetch_bench_results ~job_info () in
-              let* text = Bench_utils.bench_text results in
-              let* check_url =
-                create_check_run ~status:COMPLETED ~conclusion:SUCCESS
-                  ~title:"Bench completed successfully" ~text ()
-              in
-              let* () =
-                bench_comment ~bot_info ~owner:gh_owner ~repo:gh_repo ~number
-                  ~gitlab_url ?check_url results
-              in
-              Lwt.return_unit
-          | "failed" ->
-              let* results = Bench_utils.fetch_bench_results ~job_info () in
-              let* text = Bench_utils.bench_text results in
-              let* check_url =
-                create_check_run ~status:COMPLETED ~conclusion:NEUTRAL
-                  ~title:"Bench completed with failures" ~text ()
-              in
-              let* () =
-                bench_comment ~bot_info ~owner:gh_owner ~repo:gh_repo ~number
-                  ~gitlab_url ?check_url results
-              in
-              Lwt.return_unit
-          | "running" ->
-              let* _ =
-                create_check_run ~status:IN_PROGRESS ~title:"Bench in progress"
-                  ()
-              in
-              Lwt.return_unit
-          | "cancelled" | "canceled" ->
-              let* _ =
-                create_check_run ~status:COMPLETED ~conclusion:CANCELLED
-                  ~title:"Bench has been cancelled" ()
-              in
-              Lwt.return_unit
-          | "created" ->
-              Lwt_io.printlf "Bench job has been created, ignoring info update."
-          | _ ->
-              Lwt_io.printlf "Unknown state for bench job: %s" state ) )
-
 let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
     ~failure_reason ~external_id =
@@ -336,8 +216,8 @@ let job_action ~bot_info
       in
       match (github_repo_full_name, job_info.build_name) with
       | "rocq-prover/rocq", "bench" ->
-          update_bench_status ~bot_info job_info (gh_owner, gh_repo)
-            ~external_id ~number:pr_num
+          Bench_utils.update_bench_status ~bot_info ~job_info
+            (gh_owner, gh_repo) ~external_id ~number:pr_num
       | _, _ -> (
         match job_info.build_status with
         | "failed" ->

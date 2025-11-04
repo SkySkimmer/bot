@@ -14,3 +14,21 @@ val fetch_bench_results :
   -> (BenchResults.t, string) Result.t Lwt.t
 
 val bench_text : (BenchResults.t, string) Result.t -> string Lwt.t
+
+val bench_comment :
+     bot_info:Bot_info.t
+  -> owner:string
+  -> repo:string
+  -> number:int
+  -> gitlab_url:string
+  -> ?check_url:string
+  -> (BenchResults.t, string) Result.t
+  -> unit Lwt.t
+
+val update_bench_status :
+     bot_info:Bot_info.t
+  -> job_info:GitLab_types.ci_common_info GitLab_types.job_info
+  -> string * string
+  -> external_id:string
+  -> number:int option
+  -> unit Lwt.t
