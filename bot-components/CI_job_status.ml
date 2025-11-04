@@ -2,11 +2,23 @@ open Base
 open Bot_info
 open GitHub_types
 open GitLab_types
-open CI_utils
 open Utils
 open String_utils
 open Lwt.Infix
 open Lwt.Syntax
+
+(******************************************************************************)
+(* Types                                                                      *)
+(******************************************************************************)
+
+type build_failure = Warn of string | Retry of string | Ignore of string
+
+type rocq_job_info =
+  { docker_image: string
+  ; dependencies: string list
+  ; targets: string list
+  ; compiler: string
+  ; opam_variant: string }
 
 (******************************************************************************)
 (* CI Status Check Functions                                                 *)
@@ -236,7 +248,7 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     project_id failure_reason
   >>= fun () ->
   ( if String.equal failure_reason "runner_system_failure" then
-      Lwt.return (CI_utils.Retry "Runner failure reported by GitLab CI")
+      Lwt.return (Retry "Runner failure reported by GitLab CI")
     else
       Lwt_io.printlf
         "Failure reason reported by GitLab CI: %s.\nRetrieving the trace..."
@@ -248,15 +260,14 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
       | Ok trace ->
           trace_action ~repo_full_name:gitlab_repo_full_name trace
       | Error err ->
-          Lwt.return
-            (CI_utils.Ignore (f "Error while retrieving the trace: %s." err)) )
+          Lwt.return (Ignore (f "Error while retrieving the trace: %s." err)) )
   >>= function
-  | CI_utils.Warn trace ->
+  | Warn trace ->
       Lwt_io.printf "Actual failure.\n"
       <&> send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
             ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
             ~context ~failure_reason ~external_id ~trace
-  | CI_utils.Retry reason -> (
+  | Retry reason -> (
       Lwt_io.printlf "%s... Checking whether to retry the job." reason
       >>= fun () ->
       GitLab_queries.get_retry_nb ~bot_info ~gitlab_domain
@@ -276,7 +287,7 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
             "The job has been retried %d times before. Not retrying." retry_nb
       | Error e ->
           Lwt_io.printlf "Error while getting the number of retries: %s" e )
-  | CI_utils.Ignore reason ->
+  | Ignore reason ->
       Lwt_io.printl reason
 
 let job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info

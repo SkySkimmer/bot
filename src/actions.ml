@@ -60,17 +60,17 @@ let job_action ~bot_info
 
 let ci_minimize ~bot_info ~comment_info ~requests ~comment_on_error ~options
     ~bug_file =
-  CI_utils.minimize_failed_tests ~bot_info ~owner:comment_info.issue.issue.owner
-    ~repo:comment_info.issue.issue.repo ~pr_number:comment_info.issue.number
-    ~head_pipeline_summary:None
+  CI_minimization.minimize_failed_tests ~bot_info
+    ~owner:comment_info.issue.issue.owner ~repo:comment_info.issue.issue.repo
+    ~pr_number:comment_info.issue.number ~head_pipeline_summary:None
     ~request:
       ( match requests with
       | [] ->
-          CI_utils.RequestSuggested
+          CI_minimization.RequestSuggested
       | ["all"] ->
-          CI_utils.RequestAll
+          CI_minimization.RequestAll
       | requests ->
-          CI_utils.RequestExplicit requests )
+          CI_minimization.RequestExplicit requests )
     ~comment_on_error ~options ~bug_file ()
 
 let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
@@ -197,10 +197,10 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                   >>= fun () ->
                   match (gh_owner, gh_repo, pipeline_info.state, pr_number) with
                   | "rocq-prover", "rocq", "failed", Some pr_number ->
-                      CI_utils.minimize_failed_tests ~bot_info ~owner:gh_owner
-                        ~repo:gh_repo ~pr_number
+                      CI_minimization.minimize_failed_tests ~bot_info
+                        ~owner:gh_owner ~repo:gh_repo ~pr_number
                         ~head_pipeline_summary:(Some summary)
-                        ~request:CI_utils.Auto ~comment_on_error:false
+                        ~request:CI_minimization.Auto ~comment_on_error:false
                         ~options:"" ~bug_file:None
                         ?base_sha:pipeline_info.common_info.base_commit
                         ~head_sha:pipeline_info.common_info.head_commit ()
@@ -213,7 +213,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
   let getopt_version opt =
     options |> Utils.getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
   in
-  CI_utils.accumulate_extra_minimizer_arguments options
+  CI_minimization.accumulate_extra_minimizer_arguments options
   >>= fun minimizer_extra_arguments ->
   let coq_version = getopt_version "[Cc]oq" in
   let ocaml_version = getopt_version "[Oo][Cc]aml" in
@@ -337,7 +337,7 @@ let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
                >>= fun () ->
                Github_installations.action_as_github_app ~bot_info ~key ~app_id
                  ~owner
-                 (CI_utils.run_ci_minimization
+                 (CI_minimization.run_ci_minimization
                     ~comment_thread_id:(GitHub_ID.of_string comment_thread_id)
                     ~owner ~repo ~base ~pr_number ~head
                     ~minimizer_extra_arguments
@@ -385,7 +385,8 @@ let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
                       Could not resume minimization of %s for %s/%s#%s:\n\
                       %s"
                      target owner repo pr_number
-                     (CI_utils.run_ci_minimization_error_to_string err) )
+                     (CI_minimization.run_ci_minimization_error_to_string err)
+            )
             |> Lwt.async ;
             Server.respond_string ~status:`OK
               ~body:"Handling CI minimization resumption." ()

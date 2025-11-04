@@ -3,7 +3,6 @@ open GitLab_types
 open Utils
 open HTTP_utils
 open String_utils
-open CI_utils
 open Lwt.Infix
 
 module BenchResults = struct
@@ -72,8 +71,8 @@ let fetch_bench_results ~job_info () =
   | Ok summary_table -> (
       (* The tables include how many entries there are, this is useful
          information to know. *)
-      let* slow_number = parse_quantity slow_table "slow" in
-      let* fast_number = parse_quantity fast_table "fast" in
+      let* slow_number = CI_minimization.parse_quantity slow_table "slow" in
+      let* fast_number = CI_minimization.parse_quantity fast_table "fast" in
       match (slow_number, fast_number) with
       | Error e, _ | _, Error e ->
           Lwt.return_error (f "Fetch bench regex issue: %s" e)
