@@ -83,120 +83,6 @@ let send_doc_url ~bot_info ~github_repo_full_name job_info =
   | _ ->
       Lwt.return_unit
 
-let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
-    ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~failure_reason ~external_id =
-  let build_id = job_info.build_id in
-  let project_id = job_info.common_info.project_id in
-  Lwt_io.printf "Failed job %d of project %d.\nFailure reason: %s\n" build_id
-    project_id failure_reason
-  >>= fun () ->
-  ( if String.equal failure_reason "runner_system_failure" then
-      Lwt.return (CI_utils.Retry "Runner failure reported by GitLab CI")
-    else
-      Lwt_io.printlf
-        "Failure reason reported by GitLab CI: %s.\nRetrieving the trace..."
-        failure_reason
-      >>= fun () ->
-      GitLab_queries.get_build_trace ~bot_info ~gitlab_domain ~project_id
-        ~build_id
-      >>= function
-      | Ok trace ->
-          CI_utils.trace_action ~repo_full_name:gitlab_repo_full_name trace
-      | Error err ->
-          Lwt.return
-            (CI_utils.Ignore (f "Error while retrieving the trace: %s." err)) )
-  >>= function
-  | CI_utils.Warn trace ->
-      Lwt_io.printf "Actual failure.\n"
-      <&> CI_utils.send_status_check ~bot_info job_info ~pr_num
-            (gh_owner, gh_repo) ~github_repo_full_name ~gitlab_domain
-            ~gitlab_repo_full_name ~context ~failure_reason ~external_id ~trace
-  | CI_utils.Retry reason -> (
-      Lwt_io.printlf "%s... Checking whether to retry the job." reason
-      >>= fun () ->
-      GitLab_queries.get_retry_nb ~bot_info ~gitlab_domain
-        ~full_name:gitlab_repo_full_name ~build_id
-        ~build_name:job_info.build_name
-      >>= function
-      | Ok retry_nb when retry_nb < 3 ->
-          Lwt_io.printlf
-            "The job has been retried less than three times before (number of \
-             retries = %d). Retrying..."
-            retry_nb
-          >>= fun () ->
-          GitLab_mutations.retry_job ~bot_info ~gitlab_domain ~project_id
-            ~build_id
-      | Ok retry_nb ->
-          Lwt_io.printlf
-            "The job has been retried %d times before. Not retrying." retry_nb
-      | Error e ->
-          Lwt_io.printlf "Error while getting the number of retries: %s" e )
-  | CI_utils.Ignore reason ->
-      Lwt_io.printl reason
-
-let job_success_or_pending ~bot_info (gh_owner, gh_repo)
-    ({build_id} as job_info) ~github_repo_full_name ~gitlab_domain
-    ~gitlab_repo_full_name ~context ~state ~external_id =
-  GitHub_queries.get_status_check ~bot_info ~owner:gh_owner ~repo:gh_repo
-    ~commit:job_info.common_info.head_commit ~context
-  >>= function
-  | Ok true -> (
-      Lwt_io.printf
-        "There existed a previous status check for this build, we'll override \
-         it.\n"
-      <&>
-      let job_url =
-        f "https://%s/%s/-/jobs/%d" gitlab_domain gitlab_repo_full_name build_id
-      in
-      let state, status, conclusion, description =
-        match state with
-        | "success" ->
-            ( "success"
-            , COMPLETED
-            , Some SUCCESS
-            , "Test succeeded on GitLab CI after being retried" )
-        | "created" ->
-            ( "pending"
-            , QUEUED
-            , None
-            , "Test pending on GitLab CI after being retried" )
-        | "running" ->
-            ( "pending"
-            , IN_PROGRESS
-            , None
-            , "Test running on GitLab CI after being retried" )
-        | _ ->
-            failwith
-              (f "Error: job_success_or_pending received unknown state %s."
-                 state )
-      in
-      match bot_info.github_install_token with
-      | None ->
-          GitHub_mutations.send_status_check ~bot_info
-            ~repo_full_name:github_repo_full_name
-            ~commit:job_info.common_info.head_commit ~state ~url:job_url
-            ~context ~description
-      | Some _ -> (
-          GitHub_queries.get_repository_id ~bot_info ~owner:gh_owner
-            ~repo:gh_repo
-          >>= function
-          | Ok repo_id ->
-              let open Lwt.Syntax in
-              let+ _ =
-                GitHub_mutations.create_check_run ~bot_info ~name:context
-                  ~status ~repo_id ~head_sha:job_info.common_info.head_commit
-                  ?conclusion ~title:description ~details_url:job_url
-                  ~summary:"" ~external_id ()
-              in
-              ()
-          | Error e ->
-              Lwt_io.printf "No repo id: %s\n" e ) )
-  | Ok _ ->
-      Lwt.return_unit
-  | Error e ->
-      Lwt_io.printf "%s\n" e
-
 let job_action ~bot_info
     ({build_name; common_info= {http_repo_url}} as job_info) ~gitlab_mapping =
   let pr_num, branch_or_pr = pr_from_branch job_info.common_info.branch in
@@ -222,18 +108,18 @@ let job_action ~bot_info
         match job_info.build_status with
         | "failed" ->
             let failure_reason = Option.value_exn job_info.failure_reason in
-            job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
-              ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
-              ~context ~failure_reason ~external_id
+            CI_job_status.job_failure ~bot_info job_info ~pr_num
+              (gh_owner, gh_repo) ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~failure_reason ~external_id
         | "success" as state ->
-            job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info
-              ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
-              ~context ~state ~external_id
+            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+              job_info ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~state ~external_id
             <&> send_doc_url ~bot_info job_info ~github_repo_full_name
         | ("created" | "running") as state ->
-            job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info
-              ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
-              ~context ~state ~external_id
+            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+              job_info ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~state ~external_id
         | "cancelled" | "canceled" | "pending" ->
             (* Ideally we should check if a status was already reported for
                this job.  But it is important to avoid making dozens of

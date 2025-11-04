@@ -72,12 +72,6 @@ type ci_pr_minimization_suggestion =
   | Silent of string
 
 (******************************************************************************)
-(* GitLab Trace Processing Utilities                                         *)
-(******************************************************************************)
-
-val trace_action : repo_full_name:string -> string -> build_failure Lwt.t
-
-(******************************************************************************)
 (* Pipeline Summary and Error Formatting                                     *)
 (******************************************************************************)
 
@@ -99,24 +93,6 @@ val accumulate_extra_minimizer_arguments : string -> string list Lwt.t
 (******************************************************************************)
 
 val parse_github_artifact_url : string -> artifact_info option
-
-(******************************************************************************)
-(* CI Status Check Functions                                                 *)
-(******************************************************************************)
-
-val send_status_check :
-     bot_info:Bot_info.t
-  -> GitLab_types.ci_common_info GitLab_types.job_info
-  -> pr_num:int option
-  -> string * string
-  -> github_repo_full_name:string
-  -> gitlab_domain:string
-  -> gitlab_repo_full_name:string
-  -> context:string
-  -> failure_reason:string
-  -> external_id:string
-  -> trace:string
-  -> unit Lwt.t
 
 (******************************************************************************)
 (* CI Minimization Core Functions                                            *)
