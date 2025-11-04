@@ -31,9 +31,6 @@ val coq_bug_minimizer_results_action :
   -> string
   -> (Cohttp.Response.t * Cohttp_lwt__Body.t) Lwt.t
 
-val merge_pull_request_action :
-  bot_info:Bot_info.t -> ?t:float -> GitHub_types.comment_info -> unit Lwt.t
-
 val run_bench :
      bot_info:Bot_info.t
   -> ?key_value_pairs:(string * string) list
@@ -63,19 +60,6 @@ val pull_request_updated_action :
   -> gitlab_mapping:(string, string) Base.Hashtbl.t
   -> github_mapping:(string, string * string) Base.Hashtbl.t
   -> (Cohttp.Response.t * Cohttp_lwt__.Body.t) Lwt.t
-
-val adjust_milestone :
-     bot_info:Bot_info.t
-  -> issue:GitHub_types.issue
-  -> sleep_time:float
-  -> unit Lwt.t
-
-val project_action :
-     bot_info:Bot_info.t
-  -> pr_id:GitHub_ID.t
-  -> backport_to:string
-  -> unit
-  -> unit Lwt.t
 
 val rocq_push_action :
      bot_info:Bot_info.t

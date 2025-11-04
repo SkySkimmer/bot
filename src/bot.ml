@@ -220,7 +220,9 @@ let callback _conn req body =
           (* TODO: only for projects that requested this feature *)
           (fun () ->
             action_as_github_app ~bot_info ~key ~app_id ~owner:issue.owner
-              (adjust_milestone ~issue ~sleep_time:5.) )
+              (fun ~bot_info ->
+                GitHub_workflows.adjust_milestone ~bot_info ~issue
+                  ~sleep_time:5. ) )
           |> Lwt.async ;
           Server.respond_string ~status:`OK
             ~body:
@@ -239,8 +241,9 @@ let callback _conn req body =
           let backport_to = String.drop_suffix field 7 in
           (fun () ->
             action_as_github_app_from_install_id ~bot_info ~key ~app_id
-              ~install_id
-              (project_action ~pr_id ~backport_to ()) )
+              ~install_id (fun ~bot_info ->
+                GitHub_workflows.project_action ~bot_info ~pr_id ~backport_to () )
+            )
           |> Lwt.async ;
           Server.respond_string ~status:`OK
             ~body:
@@ -365,8 +368,9 @@ let callback _conn req body =
                   then (
                     (fun () ->
                       action_as_github_app ~bot_info ~key ~app_id
-                        ~owner:comment_info.issue.issue.owner
-                        (merge_pull_request_action comment_info) )
+                        ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
+                          GitHub_workflows.merge_pull_request_action ~bot_info
+                            comment_info ) )
                     |> Lwt.async ;
                     Server.respond_string ~status:`OK
                       ~body:(f "Received a request to merge the PR.")
