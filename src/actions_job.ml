@@ -1,0 +1,54 @@
+open Base
+open Bot_components
+open Bot_components.GitLab_types
+open Git_utils
+open Utils
+open Lwt.Infix
+
+let job_action ~bot_info
+    ({build_name; common_info= {http_repo_url}} as job_info) ~gitlab_mapping =
+  let pr_num, branch_or_pr = pr_from_branch job_info.common_info.branch in
+  let context = f "GitLab CI job %s (%s)" build_name branch_or_pr in
+  match parse_gitlab_repo_url ~http_repo_url with
+  | Error e ->
+      Lwt_io.printlf "Error in job_action: %s" e
+  | Ok (gitlab_domain, gitlab_repo_full_name) -> (
+      let gh_owner, gh_repo =
+        github_repo_of_gitlab_project_path ~gitlab_mapping ~gitlab_domain
+          ~gitlab_repo_full_name
+      in
+      let github_repo_full_name = gh_owner ^ "/" ^ gh_repo in
+      let external_id =
+        f "%s,projects/%d/jobs/%d" http_repo_url job_info.common_info.project_id
+          job_info.build_id
+      in
+      match (github_repo_full_name, job_info.build_name) with
+      | "rocq-prover/rocq", "bench" ->
+          Bench_utils.update_bench_status ~bot_info ~job_info
+            (gh_owner, gh_repo) ~external_id ~number:pr_num
+      | _, _ -> (
+        match job_info.build_status with
+        | "failed" ->
+            let failure_reason = Option.value_exn job_info.failure_reason in
+            CI_job_status.job_failure ~bot_info job_info ~pr_num
+              (gh_owner, gh_repo) ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~failure_reason ~external_id
+        | "success" as state ->
+            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+              job_info ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~state ~external_id
+            <&> CI_documentation.send_doc_url ~bot_info job_info
+                  ~github_repo_full_name
+        | ("created" | "running") as state ->
+            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+              job_info ~github_repo_full_name ~gitlab_domain
+              ~gitlab_repo_full_name ~context ~state ~external_id
+        | "cancelled" | "canceled" | "pending" ->
+            (* Ideally we should check if a status was already reported for
+               this job.  But it is important to avoid making dozens of
+               requests at once when a pipeline is canceled.  So we should
+               have a caching mechanism to limit this case to a single
+               request. *)
+            Lwt.return_unit
+        | unknown_state ->
+            Lwt_io.printlf "Unknown job status: %s" unknown_state ) )

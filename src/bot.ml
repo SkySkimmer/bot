@@ -7,11 +7,10 @@ open Bot_components.CI_minimization
 open Bot_components.CI_job_status
 open Bot_components.Bench_utils
 open Botlib
-open Actions
+open Git_utils
 open Github_installations
 open String_utils
 open Utils
-open String_utils
 
 let toml_data = Utils.toml_of_file (Sys.get_argv ()).(1)
 
@@ -75,7 +74,7 @@ let callback _conn req body =
         | Ok (owner, _) ->
             (fun () ->
               action_as_github_app ~bot_info ~key ~app_id ~owner
-                (job_action ~gitlab_mapping job_info) )
+                (Actions_job.job_action ~gitlab_mapping job_info) )
             |> Lwt.async ;
             Server.respond_string ~status:`OK ~body:"Job event." () )
       | Ok (_, PipelineEvent ({common_info= {http_repo_url}} as pipeline_info))
@@ -127,7 +126,7 @@ let callback _conn req body =
             >>= fun () ->
             action_as_github_app_from_install_id ~bot_info ~key ~app_id
               ~install_id
-              (rocq_push_action ~base_ref ~commits_msg)
+              (Actions_backport.rocq_push_action ~base_ref ~commits_msg)
             <&> action_as_github_app_from_install_id ~bot_info ~key ~app_id
                   ~install_id
                   (mirror_action ~gitlab_domain:"gitlab.inria.fr"
@@ -218,8 +217,8 @@ let callback _conn req body =
           >>= fun () ->
           action_as_github_app ~bot_info ~key ~app_id
             ~owner:pr_info.issue.issue.owner
-            (pull_request_updated_action ~action ~pr_info ~gitlab_mapping
-               ~github_mapping )
+            (Actions_pr_sync.pull_request_updated_action ~action ~pr_info
+               ~gitlab_mapping ~github_mapping )
       | Ok (_, IssueClosed {issue}) ->
           (* TODO: only for projects that requested this feature *)
           (fun () ->
@@ -366,8 +365,8 @@ let callback _conn req body =
                     >>= fun () ->
                     action_as_github_app ~bot_info ~key ~app_id
                       ~owner:comment_info.issue.issue.owner
-                      (run_ci_action ~comment_info ?full_ci ~gitlab_mapping
-                         ~github_mapping () )
+                      (Actions_pr_sync.run_ci_action ~comment_info ?full_ci
+                         ~gitlab_mapping ~github_mapping () )
                   else if
                     string_match
                       ~regexp:
@@ -495,12 +494,12 @@ let callback _conn req body =
             let close_after = 30 in
             (fun () ->
               action_as_github_app ~bot_info ~key ~app_id ~owner
-                (rocq_check_needs_rebase_pr ~owner ~repo ~warn_after
-                   ~close_after ~throttle:6 )
+                (Actions_pr_sync.rocq_check_needs_rebase_pr ~owner ~repo
+                   ~warn_after ~close_after ~throttle:6 )
               >>= fun () ->
               action_as_github_app ~bot_info ~key ~app_id ~owner
-                (rocq_check_stale_pr ~owner ~repo ~after:close_after ~throttle:4)
-              )
+                (Actions_pr_sync.rocq_check_stale_pr ~owner ~repo
+                   ~after:close_after ~throttle:4 ) )
             |> Lwt.async ;
             Server.respond_string ~status:`OK
               ~body:"Stale pull requests updated" () )

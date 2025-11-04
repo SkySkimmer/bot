@@ -2,60 +2,10 @@ open Base
 open Bot_components
 open Bot_components.Bot_info
 open Bot_components.GitHub_types
-open Bot_components.GitLab_types
 open Cohttp_lwt_unix
 open Git_utils
 open Utils
 open Lwt.Infix
-open Lwt.Syntax
-
-let job_action ~bot_info
-    ({build_name; common_info= {http_repo_url}} as job_info) ~gitlab_mapping =
-  let pr_num, branch_or_pr = pr_from_branch job_info.common_info.branch in
-  let context = f "GitLab CI job %s (%s)" build_name branch_or_pr in
-  match parse_gitlab_repo_url ~http_repo_url with
-  | Error e ->
-      Lwt_io.printlf "Error in job_action: %s" e
-  | Ok (gitlab_domain, gitlab_repo_full_name) -> (
-      let gh_owner, gh_repo =
-        github_repo_of_gitlab_project_path ~gitlab_mapping ~gitlab_domain
-          ~gitlab_repo_full_name
-      in
-      let github_repo_full_name = gh_owner ^ "/" ^ gh_repo in
-      let external_id =
-        f "%s,projects/%d/jobs/%d" http_repo_url job_info.common_info.project_id
-          job_info.build_id
-      in
-      match (github_repo_full_name, job_info.build_name) with
-      | "rocq-prover/rocq", "bench" ->
-          Bench_utils.update_bench_status ~bot_info ~job_info
-            (gh_owner, gh_repo) ~external_id ~number:pr_num
-      | _, _ -> (
-        match job_info.build_status with
-        | "failed" ->
-            let failure_reason = Option.value_exn job_info.failure_reason in
-            CI_job_status.job_failure ~bot_info job_info ~pr_num
-              (gh_owner, gh_repo) ~github_repo_full_name ~gitlab_domain
-              ~gitlab_repo_full_name ~context ~failure_reason ~external_id
-        | "success" as state ->
-            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
-              job_info ~github_repo_full_name ~gitlab_domain
-              ~gitlab_repo_full_name ~context ~state ~external_id
-            <&> CI_documentation.send_doc_url ~bot_info job_info
-                  ~github_repo_full_name
-        | ("created" | "running") as state ->
-            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
-              job_info ~github_repo_full_name ~gitlab_domain
-              ~gitlab_repo_full_name ~context ~state ~external_id
-        | "cancelled" | "canceled" | "pending" ->
-            (* Ideally we should check if a status was already reported for
-               this job.  But it is important to avoid making dozens of
-               requests at once when a pipeline is canceled.  So we should
-               have a caching mechanism to limit this case to a single
-               request. *)
-            Lwt.return_unit
-        | unknown_state ->
-            Lwt_io.printlf "Unknown job status: %s" unknown_state ) )
 
 <<<<<<< HEAD
 let ci_minimize ~bot_info ~comment_info ~requests ~comment_on_error ~options
@@ -673,82 +623,6 @@ let pull_request_updated_action ~bot_info
          pr_info.issue.issue.owner pr_info.issue.issue.repo
          pr_info.issue.issue.number )
     ()
-
-let rocq_push_action ~bot_info ~base_ref ~commits_msg =
-  let* () = Lwt_io.printl "Merge and backport commit messages:" in
-  let commit_action commit_msg =
-    if
-      String_utils.string_match
-        ~regexp:"^Merge \\(PR\\|pull request\\) #\\([0-9]*\\)" commit_msg
-    then
-      let pr_number = Str.matched_group 2 commit_msg |> Int.of_string in
-      Lwt_io.printf "%s\nPR #%d was merged.\n" commit_msg pr_number
-      >>= fun () ->
-      GitHub_queries.get_pull_request_id_and_milestone ~bot_info
-        ~owner:"rocq-prover" ~repo:"rocq" ~number:pr_number
-      >>= fun pr_info ->
-      match pr_info with
-      | Ok (pr_id, backport_info) ->
-          backport_info
-          |> Lwt_list.iter_p (fun {backport_to} ->
-                 if "refs/heads/" ^ backport_to |> String.equal base_ref then
-                   Lwt_io.printf
-                     "PR was merged into the backporting branch directly.\n"
-                   >>= fun () ->
-                   GitHub_workflows.add_to_column ~bot_info ~backport_to
-                     (`PR_ID pr_id) "Shipped"
-                 else if String.equal base_ref "refs/heads/master" then
-                   (* For now, we hard code that PRs are only backported
-                      from master.  In the future, we could make this
-                      configurable in the milestone description or in
-                      some configuration file. *)
-                   Lwt_io.printf "Backporting to %s was requested.\n"
-                     backport_to
-                   >>= fun () ->
-                   GitHub_workflows.add_to_column ~bot_info ~backport_to
-                     (`PR_ID pr_id) "Request inclusion"
-                 else
-                   Lwt_io.printf
-                     "PR was merged into a branch that is not the backporting \
-                      branch nor the master branch.\n" )
-      | Error err ->
-          Lwt_io.printf "Error: %s\n" err
-    else if
-      String_utils.string_match ~regexp:"^Backport PR #\\([0-9]*\\):" commit_msg
-    then
-      let pr_number = Str.matched_group 1 commit_msg |> Int.of_string in
-      Lwt_io.printf "%s\nPR #%d was backported.\n" commit_msg pr_number
-      >>= fun () ->
-      GitHub_queries.get_pull_request_cards ~bot_info ~owner:"rocq-prover"
-        ~repo:"rocq" ~number:pr_number
-      >>= function
-      | Ok items -> (
-          let backport_to =
-            String.chop_prefix_if_exists ~prefix:"refs/heads/" base_ref
-          in
-          let card_id =
-            items |> List.find_map ~f:(function id, 11 -> Some id | _ -> None)
-          in
-          match card_id with
-          | Some card_id ->
-              Lwt_io.printlf
-                "Pull request rocq-prover/rocq#%d found in project 11. \
-                 Updating its fields."
-                pr_number
-              >>= fun () ->
-              GitHub_workflows.add_to_column ~bot_info ~backport_to
-                (`Card_ID card_id) "Shipped"
-          | None ->
-              (* We could do something in this case, like post a comment to
-                 the PR and add the PR to the project. *)
-              Lwt_io.printlf
-                "Pull request rocq-prover/rocq#%d not found in project 11."
-                pr_number )
-      | Error e ->
-          Lwt_io.printf "%s\n" e
-    else Lwt.return_unit
-  in
-  Lwt_list.iter_s commit_action commits_msg
 
 let rocq_check_needs_rebase_pr ~bot_info ~owner ~repo ~warn_after ~close_after
     ~throttle =
