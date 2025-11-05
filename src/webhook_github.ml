@@ -72,12 +72,12 @@ let handle_push_event_for_repos ~bot_info ~key ~app_id ~install_id ~owner ~repo
 let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
     ~gitlab_mapping ~github_mapping ~install_id
     ~(comment_info : Bot_components.GitHub_types.comment_info)
-    ~coqbot_minimize_text_of_body ~coqbot_ci_minimize_text_of_body
-    ~coqbot_resume_ci_minimize_text_of_body =
+    ~minimize_text_of_body ~ci_minimize_text_of_body
+    ~resume_ci_minimize_text_of_body =
   let body =
     comment_info.body |> trim_comments |> strip_quoted_bot_name ~github_bot_name
   in
-  match coqbot_minimize_text_of_body body with
+  match minimize_text_of_body body with
   | Some (options, script) ->
       (fun () ->
         init_git_bare_repository ~bot_info
@@ -99,7 +99,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
        minimization will match the resumption string, and we
        don't want to parse "resume" as an option, we test
        resumption first *)
-    match coqbot_resume_ci_minimize_text_of_body body with
+    match resume_ci_minimize_text_of_body body with
     | Some (options, requests, bug_file) ->
         (fun () ->
           init_git_bare_repository ~bot_info
@@ -112,7 +112,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
         Server.respond_string ~status:`OK
           ~body:"Handling CI minimization resumption." ()
     | None -> (
-      match coqbot_ci_minimize_text_of_body body with
+      match ci_minimize_text_of_body body with
       | Some (options, requests) ->
           (fun () ->
             init_git_bare_repository ~bot_info
@@ -216,8 +216,8 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
 
 let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
     ~gitlab_mapping ~github_mapping ~github_webhook_secret ~headers ~body
-    ~coqbot_minimize_text_of_body ~coqbot_ci_minimize_text_of_body
-    ~coqbot_resume_ci_minimize_text_of_body =
+    ~minimize_text_of_body ~ci_minimize_text_of_body
+    ~resume_ci_minimize_text_of_body =
   body
   >>= fun body ->
   match
@@ -317,7 +317,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
       let body =
         body |> trim_comments |> strip_quoted_bot_name ~github_bot_name
       in
-      match coqbot_minimize_text_of_body body with
+      match minimize_text_of_body body with
       | Some (options, script) ->
           (fun () ->
             init_git_bare_repository ~bot_info
@@ -340,8 +340,8 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
   | Ok (install_id, CommentCreated comment_info) ->
       handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
         ~gitlab_mapping ~github_mapping ~install_id ~comment_info
-        ~coqbot_minimize_text_of_body ~coqbot_ci_minimize_text_of_body
-        ~coqbot_resume_ci_minimize_text_of_body
+        ~minimize_text_of_body ~ci_minimize_text_of_body
+        ~resume_ci_minimize_text_of_body
   | Ok (None, CheckRunReRequested _) ->
       Server.respond_string ~status:(Code.status_of_code 401)
         ~body:"Request to rerun check run must be signed." ()

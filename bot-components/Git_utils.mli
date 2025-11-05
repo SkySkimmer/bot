@@ -100,6 +100,8 @@ val mirror_action :
   -> unit
   -> unit Lwt.t
 
+val init_git_bare_repository : bot_info:Bot_info.t -> unit Lwt.t
+
 val apply_after_label :
      bot_info:Bot_info.t
   -> owner:string

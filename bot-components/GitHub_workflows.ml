@@ -310,8 +310,8 @@ let pull_request_closed_action ~bot_info
     (pr_info : issue_info pull_request_info) ~gitlab_mapping ~github_mapping
     ~remove_milestone_if_not_merged =
   let open Lwt.Infix in
-  gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
-    ~bot_info
+  gitlab_ci_ref_for_github_pr ~bot_info ~issue:pr_info.issue.issue
+    ~github_mapping ~gitlab_mapping
   >>= (function
         | Ok remote_ref ->
             git_delete ~remote_ref |> execute_cmd >|= ignore

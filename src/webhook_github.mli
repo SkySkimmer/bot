@@ -10,10 +10,10 @@ val handle_github_webhook :
   -> github_webhook_secret:string
   -> headers:Cohttp.Header.t
   -> body:string Lwt.t
-  -> coqbot_minimize_text_of_body:
+  -> minimize_text_of_body:
        (string -> (string * Minimize_parser.minimize_parsed) option)
-  -> coqbot_ci_minimize_text_of_body:(string -> (string * string list) option)
-  -> coqbot_resume_ci_minimize_text_of_body:
+  -> ci_minimize_text_of_body:(string -> (string * string list) option)
+  -> resume_ci_minimize_text_of_body:
        (   string
         -> (string * string list * Minimize_parser.minimize_parsed) option )
   -> (Cohttp.Response.t * Cohttp_lwt__Body.t) Lwt.t

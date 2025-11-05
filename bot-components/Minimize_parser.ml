@@ -49,7 +49,7 @@ let parse_minimiation_requests requests =
 (* Minimize Request Parsers                                                   *)
 (******************************************************************************)
 
-let coqbot_minimize_text_of_body ~github_bot_name body =
+let parse_minimize_text_of_body ~github_bot_name body =
   if
     string_match
       ~regexp:
@@ -86,7 +86,7 @@ let coqbot_minimize_text_of_body ~github_bot_name body =
 (* CI Minimize Request Parsers                                                *)
 (******************************************************************************)
 
-let coqbot_ci_minimize_text_of_body ~github_bot_name body =
+let parse_ci_minimize_text_of_body ~github_bot_name body =
   if
     string_match
       ~regexp:
@@ -99,7 +99,7 @@ let coqbot_ci_minimize_text_of_body ~github_bot_name body =
     Some (options, requests |> parse_minimiation_requests)
   else None
 
-let coqbot_resume_ci_minimize_text_of_body ~github_bot_name body =
+let parse_resume_ci_minimize_text_of_body ~github_bot_name body =
   if
     string_match
       ~regexp:
