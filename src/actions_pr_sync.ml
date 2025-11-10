@@ -2,6 +2,7 @@ open Base
 open Bot_components
 open Bot_components.Bot_info
 open Bot_components.GitHub_types
+open Bot_components.GitHub_GitLab_sync
 open Cohttp_lwt_unix
 open Git_utils
 open Utils

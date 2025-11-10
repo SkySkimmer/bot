@@ -1,6 +1,7 @@
 open Base
 open Bot_components
 open Bot_components.GitLab_types
+open Bot_components.GitHub_GitLab_sync
 open Git_utils
 open Utils
 open Lwt.Infix

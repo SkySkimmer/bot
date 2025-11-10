@@ -1,20 +1,3 @@
-val gitlab_repo :
-     bot_info:Bot_info.t
-  -> gitlab_domain:string
-  -> gitlab_full_name:string
-  -> (string, string) Result.t
-
-val gitlab_ci_ref_for_github_pr :
-     bot_info:Bot_info.t
-  -> issue:GitHub_types.issue
-  -> github_mapping:(string, string * string) Base.Hashtbl.t
-  -> gitlab_mapping:(string, string) Base.Hashtbl.t
-  -> (GitHub_types.remote_ref_info, string) Lwt_result.t
-(** [gitlab_ci_ref_for_github_pr] creates a GitLab remote reference for a GitHub
-  PR to enable triggering GitLab CI/CD pipelines. Returns a reference to branch
-  [refs/heads/pr-<PR_NUMBER>] on the GitLab mirror of the GitHub repository.
-*)
-
 val ( |&& ) : string -> string -> string
 
 val execute_cmd : ?mask:string list -> string -> (unit, string) result Lwt.t
@@ -73,34 +56,8 @@ val git_run_ci_minimization :
 
 val pr_from_branch : string -> int option * string
 
-val github_repo_of_gitlab_project_path :
-     gitlab_mapping:(string, string) Base.Hashtbl.t
-  -> gitlab_domain:string
-  -> gitlab_repo_full_name:string
-  -> string * string
-
 val parse_gitlab_repo_url :
   http_repo_url:string -> (string * string, string) result
-
-val github_repo_of_gitlab_url :
-     gitlab_mapping:(string, string) Base.Hashtbl.t
-  -> http_repo_url:string
-  -> (string * string, string) result
-
-val mirror_action :
-     bot_info:Bot_info.t
-  -> ?force:bool
-  -> gitlab_domain:string
-  -> gh_owner:string
-  -> gh_repo:string
-  -> gl_owner:string
-  -> gl_repo:string
-  -> base_ref:string
-  -> head_sha:string
-  -> unit
-  -> unit Lwt.t
-
-val init_git_bare_repository : bot_info:Bot_info.t -> unit Lwt.t
 
 val apply_after_label :
      bot_info:Bot_info.t

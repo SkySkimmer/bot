@@ -3,6 +3,7 @@ open GitHub_types
 open Utils
 open Lwt.Infix
 open Git_utils
+open GitHub_GitLab_sync
 
 let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
   let pr = comment_info.issue in

@@ -2,8 +2,8 @@ open Base
 open Cohttp
 open Cohttp_lwt_unix
 open Bot_components
+open Bot_components.GitHub_GitLab_sync
 open Ci_job_status
-open Git_utils
 open Lwt.Infix
 open Utils
 
