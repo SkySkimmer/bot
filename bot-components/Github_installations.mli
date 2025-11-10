@@ -1,5 +1,3 @@
-open Bot_components
-
 val installation_ids : (string, int) Base.Hashtbl.t
 
 val installation_tokens : (int, string * float) Base.Hashtbl.t

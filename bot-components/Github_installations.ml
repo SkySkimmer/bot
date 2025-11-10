@@ -1,6 +1,5 @@
 open Base
-open Bot_components
-open Helpers
+open Utils
 open Lwt
 
 let installation_ids : (string, int) Base.Hashtbl.t =
