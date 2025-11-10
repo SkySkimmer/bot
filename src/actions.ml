@@ -2706,8 +2706,8 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
       get_options
       >>= fun options ->
       let open Lwt_result.Infix in
-      gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
-        ~bot_info
+      gitlab_ci_ref_for_github_pr ~issue:pr_info.issue.issue ~gitlab_mapping
+        ~github_mapping ~bot_info
       >>= fun remote_ref ->
       git_push ~force:true ~options ~remote_ref ~local_ref:local_head_branch ()
       |> execute_cmd )
@@ -2801,8 +2801,8 @@ let pull_request_closed_action ~bot_info
     (pr_info : GitHub_types.issue_info GitHub_types.pull_request_info)
     ~gitlab_mapping ~github_mapping =
   let open Lwt.Infix in
-  gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
-    ~bot_info
+  gitlab_ci_ref_for_github_pr ~issue:pr_info.issue.issue ~gitlab_mapping
+    ~github_mapping ~bot_info
   >>= (function
         | Ok remote_ref ->
             git_delete ~remote_ref |> execute_cmd >|= ignore

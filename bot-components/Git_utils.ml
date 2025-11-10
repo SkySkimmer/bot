@@ -20,7 +20,8 @@ let report_status ?(mask = []) ?(stderr_content = "") command report code =
        ~f:(fun acc m -> Str.global_replace (Str.regexp_string m) "XXXXX" acc)
        mask )
 
-let gitlab_ref ~bot_info ~(issue : issue) ~github_mapping ~gitlab_mapping =
+let gitlab_ci_ref_for_github_pr ~bot_info ~(issue : issue) ~github_mapping
+    ~gitlab_mapping =
   let default_gitlab_domain = "gitlab.com" in
   let gh_repo = issue.owner ^ "/" ^ issue.repo in
   let open Lwt.Infix in
