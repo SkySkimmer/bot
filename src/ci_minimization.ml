@@ -276,7 +276,7 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
              ; failing_urls
              ; passing_urls
              ; docker_image } ->
-          Git_utils.git_run_ci_minimization ~bot_info ~comment_thread_id ~owner
+          Coq_utils.git_run_ci_minimization ~bot_info ~comment_thread_id ~owner
             ~repo ~pr_number ~docker_image ~ci_targets ~target ~opam_switch
             ~failing_urls ~passing_urls ~base ~head ~minimizer_extra_arguments
             ~bug_file_name
@@ -1346,7 +1346,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
         ^ Stdlib.Filename.quote_command "./handle-web-file.sh" [description; url]
         ) )
   >>= fun script ->
-  Git_utils.git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id
+  Coq_utils.git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id
     ~comment_author ~owner ~repo ~coq_version ~ocaml_version
     ~minimizer_extra_arguments
   >>= function
