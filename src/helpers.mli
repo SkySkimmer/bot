@@ -43,3 +43,5 @@ val download_to :
 
 val copy_stream :
   src:Lwt_io.input_channel -> dst:Lwt_io.output_channel -> string Lwt.t
+
+val init_git_bare_repository : bot_info:Bot_components.Bot_info.t -> unit Lwt.t

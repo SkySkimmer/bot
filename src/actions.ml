@@ -5,6 +5,7 @@ open Bot_components.GitHub_types
 open Bot_components.GitLab_types
 open Cohttp
 open Cohttp_lwt_unix
+open Coq_utils
 open Git_utils
 open Helpers
 open Lwt.Infix
@@ -1386,10 +1387,11 @@ let suggest_ci_minimization_for_pr = function
       RunAutomatically
   | {labels} when List.exists ~f:(String.equal "kind: infrastructure") labels ->
       Silent "this PR is labeled with kind: infrastructure"
-  | {body} when not (String.is_substring ~substring:"offer-minimizer: on" body) ->
+  | {body} when not (String.is_substring ~substring:"offer-minimizer: on" body)
+    ->
       Silent
-        "the PR body does not contain an 'offer-minimizer: on' directive, which turns \
-         on minimization suggestions"
+        "the PR body does not contain an 'offer-minimizer: on' directive, \
+         which turns on minimization suggestions"
   | {draft= true} ->
       Suggest
   | _ ->
@@ -2705,8 +2707,8 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
       get_options
       >>= fun options ->
       let open Lwt_result.Infix in
-      gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
-        ~bot_info
+      gitlab_ci_ref_for_github_pr ~issue:pr_info.issue.issue ~gitlab_mapping
+        ~github_mapping ~bot_info
       >>= fun remote_ref ->
       git_push ~force:true ~options ~remote_ref ~local_ref:local_head_branch ()
       |> execute_cmd )
@@ -2800,8 +2802,8 @@ let pull_request_closed_action ~bot_info
     (pr_info : GitHub_types.issue_info GitHub_types.pull_request_info)
     ~gitlab_mapping ~github_mapping =
   let open Lwt.Infix in
-  gitlab_ref ~issue:pr_info.issue.issue ~gitlab_mapping ~github_mapping
-    ~bot_info
+  gitlab_ci_ref_for_github_pr ~issue:pr_info.issue.issue ~gitlab_mapping
+    ~github_mapping ~bot_info
   >>= (function
         | Ok remote_ref ->
             git_delete ~remote_ref |> execute_cmd >|= ignore

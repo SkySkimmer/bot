@@ -137,3 +137,21 @@ let generic_get_json ~bot_info relative_uri ?(header_list = []) json_handler =
 
 let generic_get_zip ~bot_info relative_uri ?(header_list = []) zip_handler =
   generic_get ~bot_info relative_uri ~header_list (handle_zip zip_handler)
+
+let copy_stream ~src ~dst =
+  let buffer = Buffer.create 1024 in
+  let rec aux () =
+    Lwt_io.read_char_opt src
+    >>= function
+    | Some c ->
+        Buffer.add_char buffer c ;
+        Lwt_io.write_char dst c >>= aux
+    | None ->
+        Lwt.return (Buffer.contents buffer)
+  in
+  aux ()
+
+let toml_of_string s = Toml.Parser.(from_string s |> unsafe)
+
+let subkey_value toml_table k k' =
+  Toml.Lenses.(get toml_table (key k |-- table |-- key k' |-- string))

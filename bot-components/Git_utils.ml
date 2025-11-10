@@ -1,10 +1,9 @@
 open Base
-open Bot_components
-open Bot_components.Bot_info
-open Bot_components.GitHub_types
-open Helpers
+open Bot_info
+open GitHub_types
 open Lwt.Infix
 open Lwt.Syntax
+open Utils
 
 let gitlab_repo ~bot_info ~gitlab_domain ~gitlab_full_name =
   gitlab_token bot_info gitlab_domain
@@ -21,7 +20,8 @@ let report_status ?(mask = []) ?(stderr_content = "") command report code =
        ~f:(fun acc m -> Str.global_replace (Str.regexp_string m) "XXXXX" acc)
        mask )
 
-let gitlab_ref ~bot_info ~(issue : issue) ~github_mapping ~gitlab_mapping =
+let gitlab_ci_ref_for_github_pr ~bot_info ~(issue : issue) ~github_mapping
+    ~gitlab_mapping =
   let default_gitlab_domain = "gitlab.com" in
   let gh_repo = issue.owner ^ "/" ^ issue.repo in
   let open Lwt.Infix in
@@ -46,15 +46,15 @@ let gitlab_ref ~bot_info ~(issue : issue) ~github_mapping ~gitlab_mapping =
           | Ok (Some content) ->
               let gl_domain =
                 Option.value
-                  (Config.subkey_value
-                     (Config.toml_of_string content)
+                  (Utils.subkey_value
+                     (Utils.toml_of_string content)
                      "mapping" "gitlab_domain" )
                   ~default:default_gitlab_domain
               in
               let gl_repo =
                 Option.value
-                  (Config.subkey_value
-                     (Config.toml_of_string content)
+                  (Utils.subkey_value
+                     (Utils.toml_of_string content)
                      "mapping" "gitlab" )
                   ~default:gh_repo
               in
@@ -93,8 +93,8 @@ let execute_cmd ?(mask = []) command =
   Lwt_io.printf "Executing command: %s\n" command
   >>= fun () ->
   let process = Lwt_process.open_process_full (Lwt_process.shell command) in
-  let stdout_pipe = copy_stream ~src:process#stdout ~dst:Lwt_io.stdout in
-  let stderr_pipe = copy_stream ~src:process#stderr ~dst:Lwt_io.stderr in
+  let stdout_pipe = Utils.copy_stream ~src:process#stdout ~dst:Lwt_io.stdout in
+  let stderr_pipe = Utils.copy_stream ~src:process#stderr ~dst:Lwt_io.stderr in
   (* Capture stdout and stderr in parallel *)
   (* Wait for the process to finish *)
   let+ _stdout_content = stdout_pipe
@@ -161,61 +161,3 @@ let git_test_modified ~base ~head pattern =
       Error (f "%s killed by signal %d." command signal)
   | Unix.WSTOPPED signal ->
       Error (f "%s stopped by signal %d." command signal)
-
-let git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
-    ~owner ~repo ~coq_version ~ocaml_version ~minimizer_extra_arguments =
-  (* To push a new branch we need to identify as coqbot the GitHub
-     user, who is a collaborator on the run-coq-bug-minimizer repo,
-     not coqbot the GitHub App *)
-  Stdlib.Filename.quote_command "./coq_bug_minimizer.sh"
-    [ script
-    ; GitHub_ID.to_string comment_thread_id
-    ; comment_author
-    ; bot_info.github_pat
-    ; bot_info.github_name
-    ; bot_info.domain
-    ; owner
-    ; repo
-    ; coq_version
-    ; ocaml_version
-    ; minimizer_extra_arguments |> String.concat ~sep:" " ]
-  |> execute_cmd ~mask:[bot_info.github_pat]
-
-let git_run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
-    ~docker_image ~target ~ci_targets ~opam_switch ~failing_urls ~passing_urls
-    ~base ~head ~minimizer_extra_arguments ~bug_file_name =
-  (* To push a new branch we need to identify as coqbot the GitHub
-     user, who is a collaborator on the run-coq-bug-minimizer repo,
-     not coqbot the GitHub App *)
-  ( [ GitHub_ID.to_string comment_thread_id
-    ; bot_info.github_pat
-    ; bot_info.github_name
-    ; bot_info.domain
-    ; owner
-    ; repo
-    ; pr_number
-    ; docker_image
-    ; target
-    ; ci_targets |> String.concat ~sep:" "
-    ; opam_switch
-    ; failing_urls
-    ; passing_urls
-    ; base
-    ; head
-    ; minimizer_extra_arguments |> String.concat ~sep:" " ]
-  @
-  match bug_file_name with Some bug_file_name -> [bug_file_name] | None -> [] )
-  |> Stdlib.Filename.quote_command "./run_ci_minimization.sh"
-  |> execute_cmd ~mask:[bot_info.github_pat]
-
-let init_git_bare_repository ~bot_info =
-  let* () = Lwt_io.printl "Initializing repository..." in
-  "git init --bare"
-  |&& f {|git config user.email "%s"|} bot_info.email
-  |&& f {|git config user.name "%s"|} bot_info.github_name
-  |> execute_cmd ~mask:[bot_info.github_pat]
-  >>= function
-  | Ok _ ->
-      Lwt_io.printl "Bare repository initialized."
-  | Error e ->
-      Lwt_io.printlf "Error while initializing bare repository: %s." e
