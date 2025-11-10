@@ -252,6 +252,39 @@ let pull_request_updated_action ~bot_info
          pr_info.issue.issue.number )
     ()
 
+let apply_after_label ~bot_info ~owner ~repo ~after ~label ~action ~throttle ()
+    =
+  GitHub_queries.get_open_pull_requests_with_label ~bot_info ~owner ~repo ~label
+  >>= function
+  | Ok prs ->
+      let iter (pr_id, pr_number) =
+        GitHub_queries.get_pull_request_label_timeline ~bot_info ~owner ~repo
+          ~pr_number
+        >>= function
+        | Ok timeline ->
+            let find (set, name, ts) =
+              if set && String.equal name label then Some ts else None
+            in
+            (* Look for most recent label setting *)
+            let timeline = List.rev timeline in
+            let days =
+              match List.find_map ~f:find timeline with
+              | None ->
+                  (* even with a race condition it cannot happen *)
+                  failwith
+                    (f {|Anomaly: Label "%s" absent from timeline of PR #%i|}
+                       label pr_number )
+              | Some ts ->
+                  Utils.days_elapsed ts
+            in
+            if days >= after then action pr_id pr_number else Lwt.return false
+        | Error e ->
+            Lwt_io.print (f "Error: %s\n" e) >>= fun () -> Lwt.return false
+      in
+      Utils.apply_throttle throttle iter prs
+  | Error err ->
+      Lwt_io.print (f "Error: %s\n" err)
+
 let rocq_check_needs_rebase_pr ~bot_info ~owner ~repo ~warn_after ~close_after
     ~throttle =
   let rebase_label = "needs: rebase" in
