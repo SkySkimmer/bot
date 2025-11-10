@@ -25,7 +25,7 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
                    Lwt_io.printf
                      "PR was merged into the backporting branch directly.\n"
                    >>= fun () ->
-                   GitHub_workflows.add_to_column ~bot_info ~backport_to
+                   GitHub_automation.add_to_column ~bot_info ~backport_to
                      (`PR_ID pr_id) "Shipped"
                  else if String.equal base_ref "refs/heads/master" then
                    (* For now, we hard code that PRs are only backported
@@ -35,7 +35,7 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
                    Lwt_io.printf "Backporting to %s was requested.\n"
                      backport_to
                    >>= fun () ->
-                   GitHub_workflows.add_to_column ~bot_info ~backport_to
+                   GitHub_automation.add_to_column ~bot_info ~backport_to
                      (`PR_ID pr_id) "Request inclusion"
                  else
                    Lwt_io.printf
@@ -66,7 +66,7 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
                  Updating its fields."
                 pr_number
               >>= fun () ->
-              GitHub_workflows.add_to_column ~bot_info ~backport_to
+              GitHub_automation.add_to_column ~bot_info ~backport_to
                 (`Card_ID card_id) "Shipped"
           | None ->
               (* We could do something in this case, like post a comment to

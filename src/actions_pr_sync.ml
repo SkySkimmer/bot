@@ -32,7 +32,7 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
   let open Lwt_result.Syntax in
   if ok then (
     (* Remove rebase / stale label *)
-    GitHub_workflows.remove_labels_if_present ~bot_info pr_info.issue
+    GitHub_automation.remove_labels_if_present ~bot_info pr_info.issue
       [rebase_label; stale_label] ;
     (* In the Rocq Prover repo, we want to prevent untrusted contributors from
        circumventing the fact that the bench job is a manual job by changing
@@ -63,7 +63,7 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
     let open Lwt.Infix in
     if not can_trigger_ci then (
       (* Since we cannot trigger CI, in particular, we still need to run a full CI *)
-      GitHub_workflows.add_labels_if_absent ~bot_info pr_info.issue
+      GitHub_automation.add_labels_if_absent ~bot_info pr_info.issue
         [needs_full_ci_label] ;
       GitHub_mutations.post_comment ~bot_info ~id:pr_info.issue.id
         ~message:
@@ -101,12 +101,12 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
                match full_ci with
                | Some false ->
                    (* Light CI requested *)
-                   GitHub_workflows.add_labels_if_absent ~bot_info pr_info.issue
-                     [needs_full_ci_label] ;
+                   GitHub_automation.add_labels_if_absent ~bot_info
+                     pr_info.issue [needs_full_ci_label] ;
                    Lwt.return {| -o ci.variable="FULL_CI=false" |}
                | Some true ->
                    (* Full CI requested *)
-                   GitHub_workflows.remove_labels_if_present ~bot_info
+                   GitHub_automation.remove_labels_if_present ~bot_info
                      pr_info.issue
                      [needs_full_ci_label; request_full_ci_label] ;
                    Lwt.return {| -o ci.variable="FULL_CI=true" |}
@@ -119,13 +119,13 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
                             String.equal l request_full_ci_label )
                    then (
                      (* Full CI requested *)
-                     GitHub_workflows.remove_labels_if_present ~bot_info
+                     GitHub_automation.remove_labels_if_present ~bot_info
                        pr_info.issue
                        [needs_full_ci_label; request_full_ci_label] ;
                      Lwt.return {| -o ci.variable="FULL_CI=true" |} )
                    else (
                      (* Nothing requested *)
-                     GitHub_workflows.add_labels_if_absent ~bot_info
+                     GitHub_automation.add_labels_if_absent ~bot_info
                        pr_info.issue [needs_full_ci_label] ;
                      Lwt.return {| -o ci.variable="FULL_CI=false" |} ) ) ]
           >|= fun options -> String.concat ~sep:" " options
@@ -142,7 +142,7 @@ let update_pr ?full_ci ?(skip_author_check = false) ~bot_info
       |> execute_cmd )
   else (
     (* Add rebase label if it exists *)
-    GitHub_workflows.add_labels_if_absent ~bot_info pr_info.issue [rebase_label] ;
+    GitHub_automation.add_labels_if_absent ~bot_info pr_info.issue [rebase_label] ;
     (* Add fail status check *)
     match bot_info.github_install_token with
     | None ->
@@ -202,7 +202,7 @@ let run_ci_action ~bot_info ~comment_info ?full_ci ~gitlab_mapping
                    ~bot_info ~gitlab_mapping ~github_mapping
            else
              (* We inform the author of the request that they are not authorized. *)
-             GitHub_workflows.inform_user_not_in_contributors ~bot_info
+             GitHub_automation.inform_user_not_in_contributors ~bot_info
                ~comment_info
              |> Lwt_result.ok )
      |> Fn.flip Lwt_result.bind_lwt_error (fun err ->

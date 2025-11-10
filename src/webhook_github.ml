@@ -165,7 +165,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
               Bot_components.Github_installations.action_as_github_app ~bot_info
                 ~key ~app_id ~owner:comment_info.issue.issue.owner
                 (fun ~bot_info ->
-                  GitHub_workflows.merge_pull_request_action ~bot_info
+                  GitHub_automation.merge_pull_request_action ~bot_info
                     comment_info ) )
             |> Lwt.async ;
             Server.respond_string ~status:`OK
@@ -255,7 +255,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
         >>= fun () ->
         Bot_components.Github_installations.action_as_github_app ~bot_info ~key
           ~app_id ~owner:pr_info.issue.issue.owner
-          (GitHub_workflows.pull_request_closed_action pr_info ~gitlab_mapping
+          (GitHub_automation.pull_request_closed_action pr_info ~gitlab_mapping
              ~github_mapping ~remove_milestone_if_not_merged:true ) )
       |> Lwt.async ;
       Server.respond_string ~status:`OK
@@ -278,7 +278,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
       (fun () ->
         Bot_components.Github_installations.action_as_github_app ~bot_info ~key
           ~app_id ~owner:issue.owner (fun ~bot_info ->
-            GitHub_workflows.adjust_milestone ~bot_info ~issue ~sleep_time:5. )
+            GitHub_automation.adjust_milestone ~bot_info ~issue ~sleep_time:5. )
         )
       |> Lwt.async ;
       Server.respond_string ~status:`OK
@@ -299,7 +299,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
       (fun () ->
         Bot_components.Github_installations.action_as_github_app_from_install_id
           ~bot_info ~key ~app_id ~install_id (fun ~bot_info ->
-            GitHub_workflows.project_action ~bot_info ~pr_id ~backport_to () )
+            GitHub_automation.project_action ~bot_info ~pr_id ~backport_to () )
         )
       |> Lwt.async ;
       Server.respond_string ~status:`OK
