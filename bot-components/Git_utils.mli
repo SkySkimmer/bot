@@ -4,12 +4,16 @@ val gitlab_repo :
   -> gitlab_full_name:string
   -> (string, string) Result.t
 
-val gitlab_ref :
+val gitlab_ci_ref_for_github_pr :
      bot_info:Bot_info.t
   -> issue:GitHub_types.issue
   -> github_mapping:(string, string * string) Base.Hashtbl.t
   -> gitlab_mapping:(string, string) Base.Hashtbl.t
   -> (GitHub_types.remote_ref_info, string) Lwt_result.t
+(** [gitlab_ci_ref_for_github_pr] creates a GitLab remote reference for a GitHub
+  PR to enable triggering GitLab CI/CD pipelines. Returns a reference to branch
+  [refs/heads/pr-<PR_NUMBER>] on the GitLab mirror of the GitHub repository.
+*)
 
 val ( |&& ) : string -> string -> string
 

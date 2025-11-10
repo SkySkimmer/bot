@@ -6,6 +6,7 @@ open Bot_components
 open Botlib
 open Actions
 open Github_installations
+open Helpers
 open String_utils
 open Utils
 
@@ -209,7 +210,9 @@ let callback _conn req body =
           (Request.headers req) body
       with
       | Ok (_, JobEvent ({common_info= {http_repo_url}} as job_info)) -> (
-        match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+        match
+          Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+        with
         | Error error_msg ->
             (fun () -> Lwt_io.printl error_msg) |> Lwt.async ;
             Server.respond_string ~status:`Bad_request ~body:error_msg ()
@@ -221,7 +224,9 @@ let callback _conn req body =
             Server.respond_string ~status:`OK ~body:"Job event." () )
       | Ok (_, PipelineEvent ({common_info= {http_repo_url}} as pipeline_info))
         -> (
-        match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+        match
+          Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+        with
         | Error error_msg ->
             (fun () -> Lwt_io.printl error_msg) |> Lwt.async ;
             Server.respond_string ~status:`Bad_request ~body:error_msg ()

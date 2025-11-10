@@ -5,8 +5,8 @@ open Bot_components.GitHub_types
 open Bot_components.GitLab_types
 open Cohttp
 open Cohttp_lwt_unix
-open Coq_utils
 open Git_utils
+open Helpers
 open Utils
 open Lwt.Infix
 open Lwt.Syntax
@@ -2050,7 +2050,9 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
         f "%s,projects/%d/pipelines/%d" http_repo_url
           pipeline_info.common_info.project_id pipeline_info.pipeline_id
       in
-      match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+      match
+        Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+      with
       | Error err ->
           Lwt_io.printlf "Error in pipeline action: %s" err
       | Ok (gh_owner, gh_repo) -> (
