@@ -5,6 +5,7 @@ open Bot_components.GitHub_types
 open Bot_components.GitLab_types
 open Cohttp
 open Cohttp_lwt_unix
+open Coq_utils
 open Git_utils
 open Helpers
 open Lwt.Infix

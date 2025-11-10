@@ -5,7 +5,6 @@ open Lwt.Infix
 open Bot_components
 open Botlib
 open Actions
-open Git_utils
 open Github_installations
 open Helpers
 
