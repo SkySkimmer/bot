@@ -45,18 +45,18 @@ let job_action ~bot_info
                       ~head_commit:_ _ ~gitlab_repo_full_name:_ ->
                     Lwt.return_unit )
             in
-            CI_job_status.job_failure ~bot_info job_info ~pr_num
+            Ci_job_status.job_failure ~bot_info job_info ~pr_num
               (gh_owner, gh_repo) ~github_repo_full_name ~gitlab_domain
               ~gitlab_repo_full_name ~context ~failure_reason ~external_id
               ~summary_builder ~allow_failure_handler ()
         | "success" as state ->
-            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+            Ci_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
               job_info ~github_repo_full_name ~gitlab_domain
               ~gitlab_repo_full_name ~context ~state ~external_id
             <&> Ci_documentation.send_doc_url ~bot_info job_info
                   ~github_repo_full_name
         | ("created" | "running") as state ->
-            CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
+            Ci_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
               job_info ~github_repo_full_name ~gitlab_domain
               ~gitlab_repo_full_name ~context ~state ~external_id
         | "cancelled" | "canceled" | "pending" ->

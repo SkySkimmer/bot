@@ -1,3 +1,4 @@
+open Bot_components
 open String_utils
 open Base
 open Utils
@@ -5,7 +6,7 @@ open Lwt.Infix
 open GitHub_types
 open Cohttp
 open Cohttp_lwt_unix
-open Git_utils
+open Bot_components.Git_utils
 
 type artifact_info =
   | ArtifactInfo of
@@ -206,7 +207,9 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
        match bug_file with
        | None ->
            Lwt.return_ok ()
-       | Some (Minimize_parser.MinimizeScript {body= bug_file_contents}) ->
+       | Some
+           (Bot_components.Minimize_parser.MinimizeScript
+             {body= bug_file_contents} ) ->
            Lwt_io.write bug_file_ch bug_file_contents >>= Lwt.return_ok
        | Some (MinimizeAttachment {url}) -> (
          match parse_github_artifact_url url with
@@ -217,11 +220,11 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
                "Downloading artifact %s/%s:%s for %s/%s#%s (%s) (parsed from \
                 %s)"
                artifact_owner artifact_repo artifact_id owner repo pr_number
-               (GitHub_ID.to_string comment_thread_id)
+               (Bot_components.GitHub_ID.to_string comment_thread_id)
                url
              >>= fun () ->
-             GitHub_queries.get_artifact_blob ~bot_info ~owner:artifact_owner
-               ~repo:artifact_repo ~artifact_id
+             Bot_components.GitHub_queries.get_artifact_blob ~bot_info
+               ~owner:artifact_owner ~repo:artifact_repo ~artifact_id
              >>= function
              | Ok [(_filename, bug_file_contents)] ->
                  Lwt_io.write bug_file_ch bug_file_contents >>= Lwt.return_ok
@@ -245,7 +248,8 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
                       ; artifact
                       ; artifact_error= ArtifactDownloadError message } ) )
          | None ->
-             HTTP_utils.download_to ~uri:(Uri.of_string url) bug_file_ch
+             Bot_components.HTTP_utils.download_to ~uri:(Uri.of_string url)
+               bug_file_ch
              |> Lwt_result.map_error (fun error -> DownloadError {url; error}) )
       )
       >>= fun () ->
@@ -407,8 +411,8 @@ let fetch_ci_minimization_info ~bot_info ~owner ~repo ~pr_number
     | None, _ | _, None ->
         let open Lwt_result.Syntax in
         let+ {base= {sha= base}; head= {sha= head}} =
-          GitHub_queries.get_pull_request_refs ~bot_info ~owner ~repo
-            ~number:pr_number
+          Bot_components.GitHub_queries.get_pull_request_refs ~bot_info ~owner
+            ~repo ~number:pr_number
         in
         (base, head)
     | Some base, Some head ->
@@ -424,8 +428,8 @@ let fetch_ci_minimization_info ~bot_info ~owner ~repo ~pr_number
       (* TODO: figure out why there are quotes, cf https://github.com/rocq-prover/bot/issues/61 *)
       let base = Str.global_replace (Str.regexp {|"|}) "" base in
       let head = Str.global_replace (Str.regexp {|"|}) "" head in
-      GitHub_queries.get_base_and_head_checks ~bot_info ~owner ~repo ~pr_number
-        ~base ~head
+      Bot_components.GitHub_queries.get_base_and_head_checks ~bot_info ~owner
+        ~repo ~pr_number ~base ~head
       >>= function
       | Error err ->
           Lwt.return_error
@@ -1243,8 +1247,8 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
                   |> Lwt.return_some ) )
           >>= function
           | Some message ->
-              GitHub_mutations.post_comment ~id:comment_thread_id ~message
-                ~bot_info
+              Bot_components.GitHub_mutations.post_comment ~id:comment_thread_id
+                ~message ~bot_info
               >>= Utils.report_on_posting_comment
           | None ->
               Lwt_io.printlf
@@ -1254,14 +1258,14 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
       | Error err ->
           let message = run_ci_minimization_error_to_string err in
           if comment_on_error then
-            GitHub_mutations.post_comment ~id:comment_thread_id ~message
-              ~bot_info
+            Bot_components.GitHub_mutations.post_comment ~id:comment_thread_id
+              ~message ~bot_info
             >>= Utils.report_on_posting_comment
           else
             Lwt_io.printlf "Error while attempting to minimize from PR #%d:\n%s"
               pr_number message )
   | Error (Some comment_thread_id, err) when comment_on_error ->
-      GitHub_mutations.post_comment ~id:comment_thread_id
+      Bot_components.GitHub_mutations.post_comment ~id:comment_thread_id
         ~message:
           (f "Error while attempting to find job minimization information:\n%s"
              err )
@@ -1301,12 +1305,12 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
     "Parsed options for the bug minimizer at %s/%s@%s from '%s' into \
      {coq_version: '%s'; ocaml_version: '%s'; minimizer_extra_arguments: '%s'}"
     owner repo
-    (GitHub_ID.to_string comment_thread_id)
+    (Bot_components.GitHub_ID.to_string comment_thread_id)
     options coq_version ocaml_version
     (String.concat ~sep:" " minimizer_extra_arguments)
   >>= fun () ->
   ( match script with
-  | Minimize_parser.MinimizeScript {quote_kind; body} ->
+  | Bot_components.Minimize_parser.MinimizeScript {quote_kind; body} ->
       if
         List.mem ~equal:String.equal
           ["shell"; "sh"; "shell-script"; "bash"; "zsh"]
@@ -1324,7 +1328,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
         Lwt.return
           (f "#!/usr/bin/env bash\ncat > %s <<'EOF'\n%s\nEOF\ncoqc -q %s" fname
              body fname )
-  | Minimize_parser.MinimizeAttachment {description; url} ->
+  | Bot_components.Minimize_parser.MinimizeAttachment {description; url} ->
       Lwt.return
         ( "#!/usr/bin/env bash\n"
         ^ Stdlib.Filename.quote_command "./handle-web-file.sh" [description; url]
@@ -1336,7 +1340,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
   >>= function
   | Ok () ->
       (* TODO: change minimizer_url to a link to the particular action run when we can get that information *)
-      GitHub_mutations.post_comment ~id:comment_thread_id
+      Bot_components.GitHub_mutations.post_comment ~id:comment_thread_id
         ~message:
           (f
              "Hey @%s, the coq bug minimizer [is running](%s) your script, \
@@ -1347,7 +1351,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
   | Error e ->
       Lwt_io.printf "Error: %s\n" e
       >>= fun () ->
-      GitHub_mutations.post_comment ~id:comment_thread_id
+      Bot_components.GitHub_mutations.post_comment ~id:comment_thread_id
         ~message:
           (f
              "Error encountered when attempting to start the coq bug minimizer:\n\
@@ -1364,9 +1368,10 @@ let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
     | [id; author; repo_name; branch_name; owner; _repo; _ (*pr_number*)]
     | [id; author; repo_name; branch_name; owner; _repo] ->
         (fun () ->
-          Github_installations.action_as_github_app ~bot_info ~key ~app_id
-            ~owner
-            (GitHub_mutations.post_comment ~id:(GitHub_ID.of_string id)
+          Bot_components.Github_installations.action_as_github_app ~bot_info
+            ~key ~app_id ~owner
+            (Bot_components.GitHub_mutations.post_comment
+               ~id:(Bot_components.GitHub_ID.of_string id)
                ~message:(if ci then message else f "@%s, %s" author message) )
           >>= Utils.report_on_posting_comment
           <&> ( Git_utils.execute_cmd
@@ -1414,10 +1419,11 @@ let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
              fun () ->
                init_git_bare_repository ~bot_info
                >>= fun () ->
-               Github_installations.action_as_github_app ~bot_info ~key ~app_id
-                 ~owner
+               Bot_components.Github_installations.action_as_github_app
+                 ~bot_info ~key ~app_id ~owner
                  (run_ci_minimization
-                    ~comment_thread_id:(GitHub_ID.of_string comment_thread_id)
+                    ~comment_thread_id:
+                      (Bot_components.GitHub_ID.of_string comment_thread_id)
                     ~owner ~repo ~base ~pr_number ~head
                     ~minimizer_extra_arguments
                     ~ci_minimization_infos:
@@ -1430,7 +1436,7 @@ let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
                         ; full_target= target (* dummy value *) } ]
                     ~bug_file:
                       (Some
-                         (Minimize_parser.MinimizeScript
+                         (Bot_components.Minimize_parser.MinimizeScript
                             {quote_kind= ""; body= bug_file_contents} ) ) )
                >>= function
                | Ok ([], []) ->

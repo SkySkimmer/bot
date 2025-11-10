@@ -35,7 +35,7 @@ type ci_minimization_job_suggestion_info =
   ; job_target: string }
 
 type ci_minimization_pr_info =
-  { comment_thread_id: GitHub_ID.t
+  { comment_thread_id: Bot_components.GitHub_ID.t
   ; base: string
   ; head: string
   ; pr_number: int
@@ -82,15 +82,15 @@ val parse_github_artifact_url : string -> artifact_info option
 (******************************************************************************)
 
 val run_ci_minimization :
-     bot_info:Bot_info.t
-  -> comment_thread_id:GitHub_ID.t
+     bot_info:Bot_components.Bot_info.t
+  -> comment_thread_id:Bot_components.GitHub_ID.t
   -> owner:string
   -> repo:string
   -> pr_number:string
   -> base:string
   -> head:string
   -> ci_minimization_infos:ci_minimization_info list
-  -> bug_file:Minimize_parser.minimize_parsed option
+  -> bug_file:Bot_components.Minimize_parser.minimize_parsed option
   -> minimizer_extra_arguments:string list
   -> (string list * (string * string) list, run_ci_minimization_error) Result.t
      Lwt.t
@@ -99,14 +99,14 @@ val ci_minimization_extract_job_specific_info :
      head_pipeline_summary:string
   -> base_pipeline_summary:string
   -> base_checks_errors:(string * string) list
-  -> base_checks:(GitHub_types.check_tab_info * bool) list
-  -> GitHub_types.check_tab_info * bool
+  -> base_checks:(Bot_components.GitHub_types.check_tab_info * bool) list
+  -> Bot_components.GitHub_types.check_tab_info * bool
   -> ( ci_minimization_job_suggestion_info * ci_minimization_info
      , string )
      Result.t
 
 val fetch_ci_minimization_info :
-     bot_info:Bot_info.t
+     bot_info:Bot_components.Bot_info.t
   -> owner:string
   -> repo:string
   -> pr_number:int
@@ -117,7 +117,7 @@ val fetch_ci_minimization_info :
   -> ( ci_minimization_pr_info
        * (ci_minimization_job_suggestion_info * ci_minimization_info) list
        * (string * string) list
-     , GitHub_ID.t option * string )
+     , Bot_components.GitHub_ID.t option * string )
      Result.t
      Lwt.t
 
@@ -130,14 +130,14 @@ val suggest_ci_minimization_for_pr :
   ci_minimization_pr_info -> ci_pr_minimization_suggestion
 
 val minimize_failed_tests :
-     bot_info:Bot_info.t
+     bot_info:Bot_components.Bot_info.t
   -> owner:string
   -> repo:string
   -> pr_number:int
   -> head_pipeline_summary:string option
   -> request:ci_minimization_request
   -> comment_on_error:bool
-  -> bug_file:Minimize_parser.minimize_parsed option
+  -> bug_file:Bot_components.Minimize_parser.minimize_parsed option
   -> options:string
   -> ?base_sha:string
   -> ?head_sha:string
@@ -145,18 +145,18 @@ val minimize_failed_tests :
   -> unit Lwt.t
 
 val ci_minimize :
-     bot_info:Bot_info.t
-  -> comment_info:GitHub_types.comment_info
+     bot_info:Bot_components.Bot_info.t
+  -> comment_info:Bot_components.GitHub_types.comment_info
   -> requests:string list
   -> comment_on_error:bool
   -> options:string
-  -> bug_file:Minimize_parser.minimize_parsed option
+  -> bug_file:Bot_components.Minimize_parser.minimize_parsed option
   -> unit Lwt.t
 
 val run_coq_minimizer :
-     bot_info:Bot_info.t
-  -> script:Minimize_parser.minimize_parsed
-  -> comment_thread_id:GitHub_ID.t
+     bot_info:Bot_components.Bot_info.t
+  -> script:Bot_components.Minimize_parser.minimize_parsed
+  -> comment_thread_id:Bot_components.GitHub_ID.t
   -> comment_author:string
   -> owner:string
   -> repo:string
@@ -165,7 +165,7 @@ val run_coq_minimizer :
   -> unit Lwt.t
 
 val coq_bug_minimizer_results_action :
-     bot_info:Bot_info.t
+     bot_info:Bot_components.Bot_info.t
   -> ci:bool
   -> key:Mirage_crypto_pk.Rsa.priv
   -> app_id:int
@@ -173,7 +173,7 @@ val coq_bug_minimizer_results_action :
   -> (Cohttp.Response.t * Cohttp_lwt__Body.t) Lwt.t
 
 val coq_bug_minimizer_resume_ci_minimization_action :
-     bot_info:Bot_info.t
+     bot_info:Bot_components.Bot_info.t
   -> key:Mirage_crypto_pk.Rsa.priv
   -> app_id:int
   -> string

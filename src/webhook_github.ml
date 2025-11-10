@@ -3,7 +3,6 @@ open Cohttp
 open Cohttp_lwt_unix
 open Bot_components
 open Bot_components.GitHub_types
-open Bot_components.CI_minimization
 open Bench_utils
 open Git_utils
 open String_utils
@@ -84,7 +83,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
         >>= fun () ->
         Bot_components.Github_installations.action_as_github_app ~bot_info ~key
           ~app_id ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
-            CI_minimization.run_coq_minimizer ~bot_info ~script
+            Ci_minimization.run_coq_minimizer ~bot_info ~script
               ~comment_thread_id:comment_info.issue.id
               ~comment_author:comment_info.author
               ~owner:comment_info.issue.issue.owner
@@ -106,7 +105,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
           >>= fun () ->
           Bot_components.Github_installations.action_as_github_app ~bot_info
             ~key ~app_id ~owner:comment_info.issue.issue.owner (fun ~bot_info ->
-              ci_minimize ~bot_info ~comment_info ~requests
+              Ci_minimization.ci_minimize ~bot_info ~comment_info ~requests
                 ~comment_on_error:true ~options ~bug_file:(Some bug_file) ) )
         |> Lwt.async ;
         Server.respond_string ~status:`OK
@@ -120,7 +119,7 @@ let handle_comment_created ~bot_info ~key ~app_id ~github_bot_name
             Bot_components.Github_installations.action_as_github_app ~bot_info
               ~key ~app_id ~owner:comment_info.issue.issue.owner
               (fun ~bot_info ->
-                ci_minimize ~bot_info ~comment_info ~requests
+                Ci_minimization.ci_minimize ~bot_info ~comment_info ~requests
                   ~comment_on_error:true ~options ~bug_file:None ) )
           |> Lwt.async ;
           Server.respond_string ~status:`OK ~body:"Handling CI minimization." ()
@@ -324,7 +323,7 @@ let handle_github_webhook ~bot_info ~key ~app_id ~github_bot_name
             >>= fun () ->
             Bot_components.Github_installations.action_as_github_app ~bot_info
               ~key ~app_id ~owner:issue_info.issue.owner (fun ~bot_info ->
-                CI_minimization.run_coq_minimizer ~bot_info ~script
+                Ci_minimization.run_coq_minimizer ~bot_info ~script
                   ~comment_thread_id:issue_info.id
                   ~comment_author:issue_info.user ~owner:issue_info.issue.owner
                   ~repo:issue_info.issue.repo ~options

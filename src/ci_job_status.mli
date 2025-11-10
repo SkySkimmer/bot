@@ -1,8 +1,9 @@
 type build_failure = Warn of string | Retry of string | Ignore of string
 
 val send_status_check :
-     bot_info:Bot_info.t
-  -> GitLab_types.ci_common_info GitLab_types.job_info
+     bot_info:Bot_components.Bot_info.t
+  -> Bot_components.GitLab_types.ci_common_info
+     Bot_components.GitLab_types.job_info
   -> pr_num:int option
   -> string * string
   -> github_repo_full_name:string
@@ -14,7 +15,7 @@ val send_status_check :
   -> trace:string
   -> ?summary_builder:(string list -> string -> string Lwt.t)
   -> ?allow_failure_handler:
-       (   bot_info:Bot_info.t
+       (   bot_info:Bot_components.Bot_info.t
         -> job_name:string
         -> job_url:string
         -> pr_num:int option
@@ -28,8 +29,9 @@ val send_status_check :
 val trace_action : repo_full_name:string -> string -> build_failure Lwt.t
 
 val job_failure :
-     bot_info:Bot_info.t
-  -> GitLab_types.ci_common_info GitLab_types.job_info
+     bot_info:Bot_components.Bot_info.t
+  -> Bot_components.GitLab_types.ci_common_info
+     Bot_components.GitLab_types.job_info
   -> pr_num:int option
   -> string * string
   -> github_repo_full_name:string
@@ -40,7 +42,7 @@ val job_failure :
   -> external_id:string
   -> ?summary_builder:(string list -> string -> string Lwt.t)
   -> ?allow_failure_handler:
-       (   bot_info:Bot_info.t
+       (   bot_info:Bot_components.Bot_info.t
         -> job_name:string
         -> job_url:string
         -> pr_num:int option
@@ -52,9 +54,10 @@ val job_failure :
   -> unit Lwt.t
 
 val job_success_or_pending :
-     bot_info:Bot_info.t
+     bot_info:Bot_components.Bot_info.t
   -> string * string
-  -> GitLab_types.ci_common_info GitLab_types.job_info
+  -> Bot_components.GitLab_types.ci_common_info
+     Bot_components.GitLab_types.job_info
   -> github_repo_full_name:string
   -> gitlab_domain:string
   -> gitlab_repo_full_name:string
@@ -64,8 +67,8 @@ val job_success_or_pending :
   -> unit Lwt.t
 
 val pipeline_action :
-     bot_info:Bot_info.t
-  -> GitLab_types.pipeline_info
+     bot_info:Bot_components.Bot_info.t
+  -> Bot_components.GitLab_types.pipeline_info
   -> gitlab_mapping:(string, string) Base.Hashtbl.t
   -> ?full_ci_check_repo:(string * string) option
   -> ?auto_minimize_on_failure:(string * string) option

@@ -1,7 +1,8 @@
 open Base
+open Bot_components
 open Bot_info
-open GitHub_types
 open GitLab_types
+open GitHub_types
 open Utils
 open String_utils
 open Git_utils
@@ -174,7 +175,10 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
     ~failure_reason ~external_id ?summary_builder ?allow_failure_handler () =
   let build_id = job_info.build_id in
-  let project_id = job_info.common_info.project_id in
+  let project_id =
+    (job_info.common_info : Bot_components.GitLab_types.ci_common_info)
+      .project_id
+  in
   Lwt_io.printf "Failed job %d of project %d.\nFailure reason: %s\n" build_id
     project_id failure_reason
   >>= fun () ->
@@ -395,8 +399,8 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                   Lwt_io.printf "No repo id: %s\n" e
               | Ok repo_id -> (
                   let summary =
-                    CI_utils.create_pipeline_summary ?summary_top pipeline_info
-                      pipeline_url
+                    Bot_components.CI_utils.create_pipeline_summary ?summary_top
+                      pipeline_info pipeline_url
                   in
                   GitHub_mutations.create_check_run ~bot_info
                     ~name:
@@ -422,10 +426,10 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                     , Some pr_number )
                     when String.equal owner min_owner
                          && String.equal repo min_repo ->
-                      CI_minimization.minimize_failed_tests ~bot_info
+                      Ci_minimization.minimize_failed_tests ~bot_info
                         ~owner:gh_owner ~repo:gh_repo ~pr_number
                         ~head_pipeline_summary:(Some summary)
-                        ~request:CI_minimization.Auto ~comment_on_error:false
+                        ~request:Ci_minimization.Auto ~comment_on_error:false
                         ~options:"" ~bug_file:None
                         ?base_sha:pipeline_info.common_info.base_commit
                         ~head_sha:pipeline_info.common_info.head_commit ()
