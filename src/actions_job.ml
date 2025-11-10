@@ -37,7 +37,7 @@ let job_action ~bot_info
             CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
               job_info ~github_repo_full_name ~gitlab_domain
               ~gitlab_repo_full_name ~context ~state ~external_id
-            <&> CI_documentation.send_doc_url ~bot_info job_info
+            <&> Ci_documentation.send_doc_url ~bot_info job_info
                   ~github_repo_full_name
         | ("created" | "running") as state ->
             CI_job_status.job_success_or_pending ~bot_info (gh_owner, gh_repo)
