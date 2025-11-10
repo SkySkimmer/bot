@@ -48,7 +48,8 @@ let get_pull_request_milestone ~bot_info ~pr_id =
             | Some milestone ->
                 Ok
                   ( milestone.description
-                  |> Option.map ~f:(fun desc -> Utils.extract_backport_info ~bot_info ~description:desc)
+                  |> Option.map ~f:(fun desc ->
+                         Utils.extract_backport_info ~bot_info ~description:desc )
                   |> Option.value ~default:[] )
             | None ->
                 Ok [] )
@@ -82,7 +83,9 @@ let get_pull_request_id_and_milestone ~bot_info ~owner ~repo ~number =
                   Ok
                     ( GitHub_ID.of_string pr.id
                     , milestone.description
-                      |> Option.map ~f:(fun desc -> Utils.extract_backport_info ~bot_info ~description:desc)
+                      |> Option.map ~f:(fun desc ->
+                             Utils.extract_backport_info ~bot_info
+                               ~description:desc )
                       |> Option.value ~default:[] ) ) ) )
 
 let get_pull_request_id ~bot_info ~owner ~repo ~number =
