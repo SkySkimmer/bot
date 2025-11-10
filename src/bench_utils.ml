@@ -1,4 +1,5 @@
 open Base
+open Bot_components
 open GitLab_types
 open GitHub_types
 open Utils

@@ -4,7 +4,7 @@ open Cohttp_lwt_unix
 open Bot_components
 open Bot_components.GitHub_types
 open Bot_components.CI_minimization
-open Bot_components.Bench_utils
+open Bench_utils
 open Git_utils
 open String_utils
 open Utils
