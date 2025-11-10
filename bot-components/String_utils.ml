@@ -1,5 +1,4 @@
 open Base
-open GitHub_types
 
 (******************************************************************************)
 (* Regex/Pattern Matching Functions                                           *)
@@ -125,22 +124,3 @@ let string_of_mapping mapping =
   Hashtbl.fold ~init:""
     ~f:(fun ~key ~data acc -> acc ^ Printf.sprintf "(%s, %s)\n" key data)
     mapping
-
-let string_of_conclusion conclusion =
-  match conclusion with
-  | ACTION_REQUIRED ->
-      `ACTION_REQUIRED
-  | CANCELLED ->
-      `CANCELLED
-  | FAILURE ->
-      `FAILURE
-  | NEUTRAL ->
-      `NEUTRAL
-  | SKIPPED ->
-      `SKIPPED
-  | STALE ->
-      `STALE
-  | SUCCESS ->
-      `SUCCESS
-  | TIMED_OUT ->
-      `TIMED_OUT

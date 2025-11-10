@@ -6,6 +6,24 @@ open Utils
 
 let send_graphql_query = GraphQL_query.send_graphql_query ~api:GitHub
 
+let conclusion_to_graphql = function
+  | ACTION_REQUIRED ->
+      `ACTION_REQUIRED
+  | CANCELLED ->
+      `CANCELLED
+  | FAILURE ->
+      `FAILURE
+  | NEUTRAL ->
+      `NEUTRAL
+  | SKIPPED ->
+      `SKIPPED
+  | STALE ->
+      `STALE
+  | SUCCESS ->
+      `SUCCESS
+  | TIMED_OUT ->
+      `TIMED_OUT
+
 let add_card_to_project ~bot_info ~card_id ~project_id =
   let open GitHub_GraphQL.AddCardToProject in
   makeVariables
@@ -152,7 +170,7 @@ let merge_pull_request ~bot_info ?merge_method ?commit_headline ?commit_body
 
 let create_check_run ~bot_info ?conclusion ~name ~repo_id ~head_sha ~status
     ~details_url ~title ?text ~summary ?external_id () =
-  let conclusion = Option.map conclusion ~f:String_utils.string_of_conclusion in
+  let conclusion = Option.map conclusion ~f:conclusion_to_graphql in
   let status =
     match status with
     | COMPLETED ->
@@ -193,7 +211,7 @@ let create_check_run ~bot_info ?conclusion ~name ~repo_id ~head_sha ~status
 
 let update_check_run ~bot_info ~check_run_id ~repo_id ~conclusion ?details_url
     ~title ?text ~summary () =
-  let conclusion = String_utils.string_of_conclusion conclusion in
+  let conclusion = conclusion_to_graphql conclusion in
   let open GitHub_GraphQL.UpdateCheckRun in
   makeVariables
     ~checkRunId:(GitHub_ID.to_string check_run_id)

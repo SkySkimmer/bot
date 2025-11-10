@@ -50,14 +50,3 @@ val clean_gitlab_trace : string -> string list
 val shorten_ci_check_name : string -> string
 
 val string_of_mapping : (string, string) Base.Hashtbl.t -> string
-
-val string_of_conclusion :
-     GitHub_types.check_conclusion
-  -> [> `ACTION_REQUIRED
-     | `CANCELLED
-     | `FAILURE
-     | `NEUTRAL
-     | `SKIPPED
-     | `STALE
-     | `SUCCESS
-     | `TIMED_OUT ]
