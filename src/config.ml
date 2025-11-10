@@ -119,7 +119,7 @@ let make_mappings_table toml_data =
   try
     match find "mappings" toml_data with
     | Toml.Types.TTable a ->
-        parse_mappings a
+        GitHub_GitLab_sync.parse_mappings a
     | _ ->
         (Hashtbl.create (module String), Hashtbl.create (module String))
   with Stdlib.Not_found ->

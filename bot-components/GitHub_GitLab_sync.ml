@@ -4,6 +4,37 @@ open GitHub_types
 open Lwt.Infix
 open Utils
 
+(* Parses TOML mappings between GitHub and GitLab repositories *)
+let parse_mappings mappings =
+  let assoc =
+    Utils.list_table_keys mappings
+    |> List.map ~f:(fun k ->
+           match
+             ( Utils.subkey_value mappings k "github"
+             , Utils.subkey_value mappings k "gitlab" )
+           with
+           | Some gh, Some gl ->
+               let gl_domain =
+                 Utils.subkey_value mappings k "gitlab_domain"
+                 |> Option.value ~default:"gitlab.com"
+               in
+               (gh, (gl_domain, gl))
+           | _, _ ->
+               failwith (f "Missing github or gitlab key for mappings.%s" k) )
+  in
+  let assoc_rev =
+    List.map assoc ~f:(fun (gh, (gl_domain, gl)) -> (gl_domain ^ "/" ^ gl, gh))
+  in
+  let get_table t =
+    match t with
+    | `Duplicate_key _ ->
+        raise (Failure "Duplicate key in config.")
+    | `Ok t ->
+        t
+  in
+  ( get_table (Hashtbl.of_alist (module String) assoc)
+  , get_table (Hashtbl.of_alist (module String) assoc_rev) )
+
 (* Constructs a GitLab repository URL with authentication token *)
 let gitlab_repo ~bot_info ~gitlab_domain ~gitlab_full_name =
   gitlab_token bot_info gitlab_domain

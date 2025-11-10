@@ -14,16 +14,6 @@ val days_elapsed : float -> int
 
 val apply_throttle : int -> ('a -> bool Lwt.t) -> 'a list -> unit Lwt.t
 
-val format_options_for_getopts : string -> string
-
-val getopts : string -> opt:string -> string list
-
-val getopt : string -> opt:string -> string
-
-val parse_mappings :
-     Toml.Types.table
-  -> (string, string * string) Base.Hashtbl.t * (string, string) Base.Hashtbl.t
-
 val report_on_posting_comment : (string, string) result -> unit Lwt.t
 
 val extract_backport_info :

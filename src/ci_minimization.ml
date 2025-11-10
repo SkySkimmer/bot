@@ -72,6 +72,18 @@ type ci_pr_minimization_suggestion =
 (* CI Minimization Parsing Utilities                                          *)
 (******************************************************************************)
 
+let format_options_for_getopts options =
+  " " ^ options ^ " " |> Str.global_replace (Str.regexp "[\n\r\t]") " "
+
+let getopts options ~opt =
+  String_utils.map_string_matches
+    ~regexp:(f " %s\\(\\.\\|[ =:-]\\|: \\)\\([^ ]+\\) " opt)
+    ~f:(fun () -> Str.matched_group 2 options)
+    options
+
+let getopt options ~opt =
+  options |> getopts ~opt |> List.hd |> Option.value ~default:""
+
 let parse_quantity table table_name =
   let regexp = {|.*TOP \([0-9]*\)|} in
   if string_match ~regexp table then
@@ -79,8 +91,8 @@ let parse_quantity table table_name =
   else Lwt.return_error (f "parsing %s table." table_name)
 
 let accumulate_extra_minimizer_arguments options =
-  let extra_args = Utils.getopts ~opt:"extra-arg" options in
-  let inline_stdlib = Utils.getopt ~opt:"inline-stdlib" options in
+  let extra_args = getopts ~opt:"extra-arg" options in
+  let inline_stdlib = getopt ~opt:"inline-stdlib" options in
   ( if String.equal inline_stdlib "yes" then Lwt.return ["--inline-coqlib"]
     else
       ( if not (String.equal inline_stdlib "") then
@@ -1293,9 +1305,9 @@ let ci_minimize ~bot_info ~comment_info ~requests ~comment_on_error ~options
 
 let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
     ~owner ~repo ~options ~minimizer_url =
-  let options = Utils.format_options_for_getopts options in
+  let options = format_options_for_getopts options in
   let getopt_version opt =
-    options |> Utils.getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
+    options |> getopt ~opt |> Str.replace_first (Str.regexp "^[vV]") ""
   in
   accumulate_extra_minimizer_arguments options
   >>= fun minimizer_extra_arguments ->

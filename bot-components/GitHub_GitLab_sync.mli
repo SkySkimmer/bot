@@ -30,6 +30,14 @@ val gitlab_ci_ref_for_github_pr :
     PR to enable triggering GitLab CI/CD pipelines. Returns a reference to branch
     [refs/heads/pr-<PR_NUMBER>] on the GitLab mirror of the GitHub repository. *)
 
+val parse_mappings :
+     Toml.Types.table
+  -> (string, string * string) Base.Hashtbl.t * (string, string) Base.Hashtbl.t
+(** [parse_mappings] parses a TOML table containing GitHub/GitLab repository
+    mappings and returns two hashtables: one mapping GitHub repos to GitLab
+    repos (with domain), and one mapping GitLab repos (with domain) to GitHub
+    repos. *)
+
 val mirror_action :
      bot_info:Bot_info.t
   -> ?force:bool
