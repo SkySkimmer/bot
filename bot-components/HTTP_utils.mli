@@ -18,14 +18,14 @@ val send_request :
   -> string
   -> unit Lwt.t
 
-val generic_get_json :
+val github_get_json :
      bot_info:Bot_info.t
   -> string
   -> ?header_list:(string * string) list
   -> (Yojson.Basic.t -> 'a)
   -> ('a, string) result Lwt.t
 
-val generic_get_zip :
+val github_get_zip :
      bot_info:Bot_info.t
   -> string
   -> ?header_list:(string * string) list

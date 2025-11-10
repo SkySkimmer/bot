@@ -133,7 +133,7 @@ let handle_zip action body =
 (* GitHub-specific API Functions *)
 (* ========================================================================== *)
 
-let generic_get ~bot_info relative_uri ?(header_list = []) handler =
+let github_get ~bot_info relative_uri ?(header_list = []) handler =
   let open Lwt_result.Infix in
   let uri = "https://api.github.com/" ^ relative_uri |> Uri.of_string in
   let user_agent = bot_info.github_name in
@@ -142,12 +142,12 @@ let generic_get ~bot_info relative_uri ?(header_list = []) handler =
   >>= (fun body -> Cohttp_lwt.Body.to_string body |> Lwt_result.ok)
   >>= handler
 
-let generic_get_json ~bot_info relative_uri ?(header_list = []) json_handler =
-  generic_get ~bot_info relative_uri ~header_list (fun body ->
+let github_get_json ~bot_info relative_uri ?(header_list = []) json_handler =
+  github_get ~bot_info relative_uri ~header_list (fun body ->
       body |> handle_json json_handler |> Lwt.return )
 
-let generic_get_zip ~bot_info relative_uri ?(header_list = []) zip_handler =
-  generic_get ~bot_info relative_uri ~header_list (handle_zip zip_handler)
+let github_get_zip ~bot_info relative_uri ?(header_list = []) zip_handler =
+  github_get ~bot_info relative_uri ~header_list (handle_zip zip_handler)
 
 (* ========================================================================== *)
 (* Stream and Download Utilities *)
