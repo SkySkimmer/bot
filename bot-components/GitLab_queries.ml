@@ -17,7 +17,7 @@ let get_build_trace ~bot_info ~gitlab_domain ~project_id ~build_id =
   |> Lwt.return
   >>= fun (name, token) ->
   let gitlab_header = [("Private-Token", token)] in
-  let headers = Utils.headers gitlab_header name in
+  let headers = HTTP_utils.headers gitlab_header name in
   let open Lwt.Infix in
   Client.get ~headers uri
   >>= fun (_response, body) ->

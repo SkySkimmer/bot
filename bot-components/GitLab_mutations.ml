@@ -11,7 +11,8 @@ let generic_retry ~bot_info ~gitlab_domain ~url_part =
       Lwt_io.printlf "Error when retrying job %s: %s." url_part err
   | Ok (name, token) ->
       let gitlab_header = [("Private-Token", token)] in
-      Utils.send_request ~body:Cohttp_lwt.Body.empty ~uri gitlab_header name
+      HTTP_utils.send_request ~body:Cohttp_lwt.Body.empty ~uri gitlab_header
+        name
 
 let retry_job ~bot_info ~gitlab_domain ~project_id ~build_id =
   generic_retry ~bot_info ~gitlab_domain
@@ -46,4 +47,4 @@ let play_job ~bot_info ~gitlab_domain ~project_id ~build_id
             |> f {|{ "job_variables_attributes": [%s] }|}
             |> Cohttp_lwt.Body.of_string
       in
-      Utils.send_request ~body ~uri gitlab_header name
+      HTTP_utils.send_request ~body ~uri gitlab_header name

@@ -9,7 +9,7 @@ let extract_commit json =
   let commit_json = json |> member "commit" in
   let message = commit_json |> member "message" |> to_string in
   if
-    string_match
+    String_utils.string_match
       ~regexp:"Bot merge \\([a-zA-Z0-9]*\\) [a-z]* \\([a-zA-Z0-9]*\\)" message
   then (Some (Str.matched_group 1 message), Str.matched_group 2 message)
   else

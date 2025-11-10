@@ -7,6 +7,8 @@ open Botlib
 open Actions
 open Github_installations
 open Helpers
+open String_utils
+open Utils
 
 let toml_data = Config.toml_of_file (Sys.get_argv ()).(1)
 
@@ -75,7 +77,7 @@ let callback _conn req body =
     in
     let coqbot_minimize_text_of_body body =
       if
-        string_match
+        String_utils.string_match
           ~regexp:
             ( f
                 "@%s:? [Mm]inimize\\([^`]*\\)```\\([^\n\
@@ -208,7 +210,9 @@ let callback _conn req body =
           (Request.headers req) body
       with
       | Ok (_, JobEvent ({common_info= {http_repo_url}} as job_info)) -> (
-        match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+        match
+          Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+        with
         | Error error_msg ->
             (fun () -> Lwt_io.printl error_msg) |> Lwt.async ;
             Server.respond_string ~status:`Bad_request ~body:error_msg ()
@@ -220,7 +224,9 @@ let callback _conn req body =
             Server.respond_string ~status:`OK ~body:"Job event." () )
       | Ok (_, PipelineEvent ({common_info= {http_repo_url}} as pipeline_info))
         -> (
-        match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+        match
+          Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+        with
         | Error error_msg ->
             (fun () -> Lwt_io.printl error_msg) |> Lwt.async ;
             Server.respond_string ~status:`Bad_request ~body:error_msg ()
@@ -560,7 +566,7 @@ let callback _conn req body =
             let external_id_parsed =
               match String.split ~on:',' external_id with
               | [http_repo_url; url_part] -> (
-                match Helpers.parse_gitlab_repo_url ~http_repo_url with
+                match Git_utils.parse_gitlab_repo_url ~http_repo_url with
                 | Error _ ->
                     None
                 | Ok (gitlab_domain, _) ->

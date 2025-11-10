@@ -5,9 +5,9 @@ open Bot_components.GitHub_types
 open Bot_components.GitLab_types
 open Cohttp
 open Cohttp_lwt_unix
-open Coq_utils
 open Git_utils
 open Helpers
+open Utils
 open Lwt.Infix
 open Lwt.Syntax
 
@@ -76,13 +76,15 @@ let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     let find regexps =
       List.find_map trace_lines ~f:(fun line ->
           List.find_map regexps ~f:(fun regexp ->
-              if string_match ~regexp line then Some (Str.matched_group 1 line)
+              if String_utils.string_match ~regexp line then
+                Some (Str.matched_group 1 line)
               else None ) )
     in
     let find_all regexps =
       List.filter_map trace_lines ~f:(fun line ->
           List.find_map regexps ~f:(fun regexp ->
-              if string_match ~regexp line then Some (Str.matched_group 1 line)
+              if String_utils.string_match ~regexp line then
+                Some (Str.matched_group 1 line)
               else None ) )
     in
     find
@@ -318,7 +320,7 @@ let fetch_bench_results ~job_info () =
         let* slow_table_or_err = artifact_url "slow_table" |> fetch_artifact in
         match slow_table_or_err with
         | Ok s ->
-            Lwt.return (code_wrap s)
+            Lwt.return (String_utils.code_wrap s)
         | Error err ->
             Lwt_io.printlf "Error fetching slow_table: %s" err
             >>= fun () -> Lwt.return "" )
@@ -332,7 +334,7 @@ let fetch_bench_results ~job_info () =
         let* fast_table_or_err = artifact_url "fast_table" |> fetch_artifact in
         match fast_table_or_err with
         | Ok s ->
-            Lwt.return (code_wrap s)
+            Lwt.return (String_utils.code_wrap s)
         | Error err ->
             Lwt_io.printlf "Error fetching fast_table: %s" err
             >>= fun () -> Lwt.return "" )
@@ -346,7 +348,7 @@ let fetch_bench_results ~job_info () =
          information to know. *)
       let parse_quantity table table_name =
         let regexp = {|.*TOP \([0-9]*\)|} in
-        if Helpers.string_match ~regexp table then
+        if String_utils.string_match ~regexp table then
           Str.matched_group 1 table |> Int.of_string |> Lwt.return_ok
         else Lwt.return_error (f "parsing %s table." table_name)
       in
@@ -371,7 +373,7 @@ let bench_text = function
       (* Document *)
       let open BenchResults in
       [ header2 ":checkered_flag: Bench Summary:"
-      ; code_wrap results.summary_table
+      ; String_utils.code_wrap results.summary_table
       ; results.failures
       ; header2 @@ f ":turtle: Top %d slow downs:" results.slow_number
       ; results.slow_table
@@ -395,7 +397,7 @@ let bench_comment ~bot_info ~owner ~repo ~number ~gitlab_url ?check_url
         in
         let link text url = f "[%s](%s)" text url in
         [ ":checkered_flag: Bench results:"
-        ; code_wrap results.summary_table
+        ; String_utils.code_wrap results.summary_table
         ; results.failures
         ; details
             (f ":turtle: Top %d slow downs" results.slow_number)
@@ -510,7 +512,7 @@ let trace_action ~repo_full_name trace =
   |> Lwt_io.printlf "Trace size: %d."
   >>= fun () ->
   Lwt.return
-    (let test regexp = string_match ~regexp trace in
+    (let test regexp = String_utils.string_match ~regexp trace in
      if test "Job failed: exit code 137" then Retry "Exit code 137"
      else if test "Job failed: exit status 255" then Retry "Exit status 255"
      else if test "Job failed (system failure)" then Retry "System failure"
@@ -764,7 +766,7 @@ let parse_github_artifact_url url =
     Str.quote github_prefix
     ^ "\\([^/]+\\)/\\([^/]+\\)/\\(actions/runs\\|suites\\)/.*/artifacts/\\([0-9]+\\)"
   in
-  if string_match ~regexp url then
+  if String_utils.string_match ~regexp url then
     Some
       (ArtifactInfo
          { artifact_owner= Str.matched_group 1 url
@@ -859,7 +861,7 @@ let run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
                       ; artifact
                       ; artifact_error= ArtifactDownloadError message } ) )
          | None ->
-             download_to ~uri:(Uri.of_string url) bug_file_ch
+             HTTP_utils.download_to ~uri:(Uri.of_string url) bug_file_ch
              |> Lwt_result.map_error (fun error -> DownloadError {url; error}) )
       )
       >>= fun () ->
@@ -915,14 +917,16 @@ let ci_minimization_extract_job_specific_info ~head_pipeline_summary
             String.equal full_name base_name && not success_base )
           base_checks
       in
-      if string_match ~regexp:"\\([^: ]*\\):\\(ci-[A-Za-z0-9_-]*\\)" full_name
+      if
+        String_utils.string_match ~regexp:"\\([^: ]*\\):\\(ci-[A-Za-z0-9_-]*\\)"
+          full_name
       then
         let name = Str.matched_group 0 full_name in
         let job_kind = Str.matched_group 1 full_name in
         let target = Str.matched_group 2 full_name in
         let extract_artifact_url job_name summary =
           if
-            string_match
+            String_utils.string_match
               ~regexp:(f "\\[%s\\](\\([^)]+\\))" (Str.quote job_name))
               summary
           then Some (Str.matched_group 1 summary ^ "/artifacts/download")
@@ -932,7 +936,7 @@ let ci_minimization_extract_job_specific_info ~head_pipeline_summary
           f "<details><summary>%s</summary>\n\n%s\n</details>\n" name summary
         in
         if
-          string_match
+          String_utils.string_match
             ~regexp:
               "This job ran on the Docker image `\\([^`]+\\)` with OCaml \
                `\\([^`]+\\)` and depended on jobs \\(\\(`[^`]+` ?\\)+\\). It \
@@ -949,7 +953,7 @@ let ci_minimization_extract_job_specific_info ~head_pipeline_summary
           let ci_targets = Str.split (Str.regexp "[ `]+") targets in
           let missing_error, non_v_file =
             if
-              string_match
+              String_utils.string_match
                 ~regexp:
                   "\n\
                    File \"\\([^\"]*\\)\", line [0-9]*, characters [0-9]*-[0-9]*:\n\
@@ -1149,11 +1153,14 @@ let fetch_ci_minimization_info ~bot_info ~owner ~repo ~pr_number
               >>= fun () ->
               let failed_test_suite_jobs =
                 List.filter_map head_checks ~f:(fun ({name}, success) ->
-                    if string_match ~regexp:"test-suite" name && not success
+                    if
+                      String_utils.string_match ~regexp:"test-suite" name
+                      && not success
                     then Some name
                     else None )
                 @ List.filter_map head_checks_errors ~f:(fun (name, _) ->
-                      if string_match ~regexp:"test-suite" name then Some name
+                      if String_utils.string_match ~regexp:"test-suite" name
+                      then Some name
                       else None )
               in
               let possible_jobs_to_minimize, unminimizable_jobs =
@@ -1401,7 +1408,7 @@ let format_options_for_getopts options =
   " " ^ options ^ " " |> Str.global_replace (Str.regexp "[\n\r\t]") " "
 
 let getopts options ~opt =
-  map_string_matches
+  String_utils.map_string_matches
     ~regexp:(f " %s\\(\\.\\|[ =:-]\\|: \\)\\([^ ]+\\) " opt)
     ~f:(fun () -> Str.matched_group 2 options)
     options
@@ -1701,19 +1708,24 @@ let minimize_failed_tests ~bot_info ~owner ~repo ~pr_number
               |> List.partition3_map ~f:(fun request ->
                      match
                        ( List.exists
-                           ~f:(string_match ~regexp:(Str.quote request))
+                           ~f:
+                             (String_utils.string_match
+                                ~regexp:(Str.quote request) )
                            jobs_minimized
                        , List.find
                            ~f:(fun (target, _) ->
-                             string_match ~regexp:(Str.quote request) target )
+                             String_utils.string_match
+                               ~regexp:(Str.quote request) target )
                            jobs_that_could_not_be_minimized
                        , List.find
                            ~f:(fun (target, _) ->
-                             string_match ~regexp:(Str.quote request) target )
+                             String_utils.string_match
+                               ~regexp:(Str.quote request) target )
                            unminimizable_jobs
                        , List.find
                            ~f:(fun (_, {target}) ->
-                             string_match ~regexp:(Str.quote request) target )
+                             String_utils.string_match
+                               ~regexp:(Str.quote request) target )
                            bad_jobs_to_minimize )
                      with
                      | true, _, _, _ ->
@@ -2038,7 +2050,9 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
         f "%s,projects/%d/pipelines/%d" http_repo_url
           pipeline_info.common_info.project_id pipeline_info.pipeline_id
       in
-      match github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url with
+      match
+        Git_utils.github_repo_of_gitlab_url ~gitlab_mapping ~http_repo_url
+      with
       | Error err ->
           Lwt_io.printlf "Error in pipeline action: %s" err
       | Ok (gh_owner, gh_repo) -> (
@@ -2226,7 +2240,7 @@ let run_coq_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
       >>= GitHub_mutations.report_on_posting_comment
 
 let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
-  if string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
+  if String_utils.string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
     let stamp = Str.matched_group 1 body in
     let message = Str.matched_group 2 body in
     match Str.split (Str.regexp " ") stamp with
@@ -2259,7 +2273,7 @@ let coq_bug_minimizer_results_action ~bot_info ~ci ~key ~app_id body =
 
 let coq_bug_minimizer_resume_ci_minimization_action ~bot_info ~key ~app_id body
     =
-  if string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
+  if String_utils.string_match ~regexp:"\\([^\n]+\\)\n\\([^\r]*\\)" body then
     let stamp = Str.matched_group 1 body in
     let message = Str.matched_group 2 body in
     match Str.split (Str.regexp " ") stamp with
@@ -2363,12 +2377,13 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
           then None
           else Some "You are not among the assignees." )
       ; comment_info.issue.labels
-        |> List.find ~f:(fun label -> string_match ~regexp:"needs:.*" label)
+        |> List.find ~f:(fun label ->
+               String_utils.string_match ~regexp:"needs:.*" label )
         |> Option.map ~f:(fun l -> f "There is still a `%s` label." l)
       ; ( if
             comment_info.issue.labels
             |> List.exists ~f:(fun label ->
-                   string_match ~regexp:"kind:.*" label )
+                   String_utils.string_match ~regexp:"kind:.*" label )
           then None
           else Some "There is no `kind:` label." )
       ; ( if comment_info.issue.milestoned then None
@@ -2467,8 +2482,8 @@ let rec merge_pull_request_action ~bot_info ?(t = 1.) comment_info =
                       List.fold_left ~init:[] reviews_info.files
                         ~f:(fun acc f ->
                           if
-                            string_match ~regexp:"dev/ci/user-overlays/\\(.*\\)"
-                              f
+                            String_utils.string_match
+                              ~regexp:"dev/ci/user-overlays/\\(.*\\)" f
                           then
                             let f = Str.matched_group 1 f in
                             if String.equal f "README.md" then acc else f :: acc
@@ -2982,8 +2997,8 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
   let* () = Lwt_io.printl "Merge and backport commit messages:" in
   let commit_action commit_msg =
     if
-      string_match ~regexp:"^Merge \\(PR\\|pull request\\) #\\([0-9]*\\)"
-        commit_msg
+      String_utils.string_match
+        ~regexp:"^Merge \\(PR\\|pull request\\) #\\([0-9]*\\)" commit_msg
     then
       let pr_number = Str.matched_group 2 commit_msg |> Int.of_string in
       Lwt_io.printf "%s\nPR #%d was merged.\n" commit_msg pr_number
@@ -3016,7 +3031,9 @@ let rocq_push_action ~bot_info ~base_ref ~commits_msg =
                       branch nor the master branch.\n" )
       | Error err ->
           Lwt_io.printf "Error: %s\n" err
-    else if string_match ~regexp:"^Backport PR #\\([0-9]*\\):" commit_msg then
+    else if
+      String_utils.string_match ~regexp:"^Backport PR #\\([0-9]*\\):" commit_msg
+    then
       let pr_number = Str.matched_group 1 commit_msg |> Int.of_string in
       Lwt_io.printf "%s\nPR #%d was backported.\n" commit_msg pr_number
       >>= fun () ->
@@ -3188,14 +3205,14 @@ let run_bench ~bot_info ?key_value_pairs comment_info =
             f {|.*%s\([0-9]*\)|}
               (Str.quote "[bench](https://gitlab.inria.fr/coq/coq/-/jobs/")
           in
-          ( if Helpers.string_match ~regexp summary then
+          ( if String_utils.string_match ~regexp summary then
               Str.matched_group 1 summary
             else raise @@ Stdlib.Failure "Could not find GitLab bench job ID" )
           |> Stdlib.int_of_string
         in
         let project_id =
           let regexp = {|.*GitLab Project ID: \([0-9]*\)|} in
-          ( if Helpers.string_match ~regexp summary then
+          ( if String_utils.string_match ~regexp summary then
               Str.matched_group 1 summary
             else raise @@ Stdlib.Failure "Could not find GitLab Project ID" )
           |> Int.of_string

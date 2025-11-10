@@ -28,7 +28,8 @@ let issue_info_of_json ?issue_json json =
       (match issue_json |> member "milestone" with `Null -> false | _ -> true)
   ; pull_request=
       issue_json |> member "html_url" |> to_string
-      |> string_match ~regexp:"https://github.com/[^/]*/[^/]*/pull/[0-9]*"
+      |> String_utils.string_match
+           ~regexp:"https://github.com/[^/]*/[^/]*/pull/[0-9]*"
   ; body= issue_json |> member "body" |> to_string_option
   ; assignees=
       issue_json |> member "assignees" |> to_list
