@@ -12,6 +12,17 @@ val send_status_check :
   -> failure_reason:string
   -> external_id:string
   -> trace:string
+  -> ?summary_builder:(string list -> string -> string Lwt.t)
+  -> ?allow_failure_handler:
+       (   bot_info:Bot_info.t
+        -> job_name:string
+        -> job_url:string
+        -> pr_num:int option
+        -> head_commit:string
+        -> string * string
+        -> gitlab_repo_full_name:string
+        -> unit Lwt.t )
+  -> unit
   -> unit Lwt.t
 
 val trace_action : repo_full_name:string -> string -> build_failure Lwt.t
@@ -27,6 +38,17 @@ val job_failure :
   -> context:string
   -> failure_reason:string
   -> external_id:string
+  -> ?summary_builder:(string list -> string -> string Lwt.t)
+  -> ?allow_failure_handler:
+       (   bot_info:Bot_info.t
+        -> job_name:string
+        -> job_url:string
+        -> pr_num:int option
+        -> head_commit:string
+        -> string * string
+        -> gitlab_repo_full_name:string
+        -> unit Lwt.t )
+  -> unit
   -> unit Lwt.t
 
 val job_success_or_pending :

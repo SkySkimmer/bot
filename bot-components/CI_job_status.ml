@@ -14,20 +14,18 @@ open Lwt.Syntax
 
 type build_failure = Warn of string | Retry of string | Ignore of string
 
-type rocq_job_info =
-  { docker_image: string
-  ; dependencies: string list
-  ; targets: string list
-  ; compiler: string
-  ; opam_variant: string }
-
 (******************************************************************************)
 (* CI Status Check Functions                                                 *)
 (******************************************************************************)
 
 let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~failure_reason ~external_id ~trace =
+    ~failure_reason ~external_id ~trace
+    ?(summary_builder = fun _ trace_description -> Lwt.return trace_description)
+    ?(allow_failure_handler =
+      fun ~bot_info:_ ~job_name:_ ~job_url:_ ~pr_num:_ ~head_commit:_
+          (_gh_owner, _gh_repo) ~gitlab_repo_full_name:_ ->
+        Lwt.return_unit) () =
   let job_url =
     f "https://%s/%s/-/jobs/%d" gitlab_domain gitlab_repo_full_name
       job_info.build_id
@@ -71,46 +69,7 @@ let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
           |> Fn.flip List.drop (index_of_error - 1)
           |> Fn.flip List.take 40 |> String.concat ~sep:"\n" )
   in
-  let rocq_job_info =
-    let open Option in
-    find_regex_in_lines
-      ~regexps:
-        [ "^Using Docker executor with image \\([^ ]+\\)"
-        ; "options=Options(docker='\\([^']+\\)')" ]
-      trace_lines
-    >>= fun docker_image ->
-    let dependencies =
-      find_all_regex_in_lines
-        ~regexps:["^Downloading artifacts for \\([^ ]+\\)"]
-        trace_lines
-    in
-    (* The CI script prints "CI_TARGETS=foo bar" through "env" if it is non-default,
-       then "CI_TARGETS = foo bar" even if it is the default (from job name).
-       We use the later. *)
-    find_regex_in_lines ~regexps:["^CI_TARGETS = \\(.*\\)"] trace_lines
-    >>= fun targets ->
-    let targets = String.split ~on:' ' targets in
-    find_regex_in_lines ~regexps:["^COMPILER=\\(.*\\)"] trace_lines
-    >>= fun compiler ->
-    find_regex_in_lines ~regexps:["^OPAM_VARIANT=\\(.*\\)"] trace_lines
-    >>= fun opam_variant ->
-    Some {docker_image; dependencies; targets; compiler; opam_variant}
-  in
-  let* summary_tail_prefix =
-    match rocq_job_info with
-    | Some {docker_image; dependencies; targets; compiler; opam_variant} ->
-        let switch_name = compiler ^ opam_variant in
-        let dependencies = String.concat ~sep:"` `" dependencies in
-        let targets = String.concat ~sep:"` `" targets in
-        Lwt.return
-          (f
-             "This job ran on the Docker image `%s` with OCaml `%s` and \
-              depended on jobs `%s`. It built targets `%s`.\n\n"
-             docker_image switch_name dependencies targets )
-    | None ->
-        Lwt.return ""
-  in
-  let summary_tail = summary_tail_prefix ^ trace_description in
+  let* summary_tail = summary_builder trace_lines trace_description in
   let text = "```\n" ^ short_trace ^ "\n```" in
   if job_info.allow_fail then
     Lwt_io.printf "Job is allowed to fail.\n"
@@ -135,38 +94,9 @@ let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
                 ()
             | Error e ->
                 Lwt_io.printf "No repo id: %s\n" e ) )
-    <&>
-    (* If we are in a PR branch, we can post a comment. *)
-    if String.equal job_info.build_name "library:ci-fiat_crypto_legacy" then
-      let message =
-        f "The job [%s](%s) has failed in allow failure mode\nping @JasonGross"
-          job_info.build_name job_url
-      in
-      match pr_num with
-      | Some number -> (
-          GitHub_queries.get_pull_request_refs ~bot_info ~owner:gh_owner
-            ~repo:gh_repo ~number
-          >>= function
-          | Ok {issue= id; head}
-          (* Commits reported back by get_pull_request_refs are surrounded in double quotes *)
-            when String.equal head.sha
-                   (f {|"%s"|} job_info.common_info.head_commit) ->
-              GitHub_mutations.post_comment ~bot_info ~id ~message
-              >>= Utils.report_on_posting_comment
-          | Ok {head} ->
-              Lwt_io.printf
-                "We are on a PR branch but the commit (%s) is not the current \
-                 head of the PR (%s). Doing nothing.\n"
-                job_info.common_info.head_commit head.sha
-          | Error err ->
-              Lwt_io.printf
-                "Couldn't get a database id for %s#%d because the following \
-                 error occured:\n\
-                 %s\n"
-                gitlab_repo_full_name number err )
-      | None ->
-          Lwt_io.printf "We are not on a PR branch. Doing nothing.\n"
-    else Lwt.return_unit
+    <&> allow_failure_handler ~bot_info ~job_name:job_info.build_name ~job_url
+          ~pr_num ~head_commit:job_info.common_info.head_commit
+          (gh_owner, gh_repo) ~gitlab_repo_full_name
   else
     Lwt_io.printf "Pushing a status check...\n"
     <&>
@@ -242,7 +172,7 @@ let trace_action ~repo_full_name trace =
 
 let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
     ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~failure_reason ~external_id =
+    ~failure_reason ~external_id ?summary_builder ?allow_failure_handler () =
   let build_id = job_info.build_id in
   let project_id = job_info.common_info.project_id in
   Lwt_io.printf "Failed job %d of project %d.\nFailure reason: %s\n" build_id
@@ -267,7 +197,8 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
       Lwt_io.printf "Actual failure.\n"
       <&> send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
             ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
-            ~context ~failure_reason ~external_id ~trace
+            ~context ~failure_reason ~external_id ~trace ?summary_builder
+            ?allow_failure_handler ()
   | Retry reason -> (
       Lwt_io.printlf "%s... Checking whether to retry the job." reason
       >>= fun () ->
