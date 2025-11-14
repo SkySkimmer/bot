@@ -26,8 +26,6 @@ val post_comment :
   -> message:string
   -> (string, string) result Lwt.t
 
-val report_on_posting_comment : (string, string) result -> unit Lwt.t
-
 val close_pull_request : bot_info:Bot_info.t -> pr_id:GitHub_ID.t -> unit Lwt.t
 
 val merge_pull_request :
@@ -65,9 +63,6 @@ val update_check_run :
   -> summary:string
   -> unit
   -> unit Lwt.t
-
-val reflect_pull_request_milestone :
-  bot_info:Bot_info.t -> issue_closer_info -> unit Lwt.t
 
 val add_labels :
      bot_info:Bot_info.t

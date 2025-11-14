@@ -39,3 +39,5 @@ val download : uri:Uri.t -> string -> (unit, string) Lwt_result.t
 
 val download_to :
   uri:Uri.t -> Lwt_io.output_channel -> (unit, string) Lwt_result.t
+
+val fetch_artifact : string -> (string, string) Result.t Lwt.t

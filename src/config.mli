@@ -1,11 +1,3 @@
-val toml_of_file : string -> Toml.Types.table
-
-val toml_of_string : string -> Toml.Types.table
-
-val subkey_value : Toml.Types.table -> string -> string -> string option
-
-val string_of_mapping : (string, string) Base.Hashtbl.t -> string
-
 val port : Toml.Types.table -> int
 
 val gitlab_instances :

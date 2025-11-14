@@ -6,36 +6,6 @@ open Utils
 
 let send_graphql_query = GraphQL_query.send_graphql_query ~api:GitHub
 
-let extract_backport_info ~(bot_info : Bot_info.t) description :
-    backport_info list =
-  let main_regexp =
-    "backport to \\([^ ]*\\) (.*move rejected PRs to: "
-    ^ "https://github.com/[^/]*/[^/]*/milestone/\\([0-9]+\\)" ^ ")"
-  in
-  let begin_regexp = bot_info.github_name ^ ": \\(.*\\)$" in
-  let backport_info_unit = main_regexp ^ "; \\(.*\\)$" in
-  let end_regexp = main_regexp in
-  let rec aux description =
-    if String_utils.string_match ~regexp:backport_info_unit description then
-      let backport_to = Str.matched_group 1 description in
-      let rejected_milestone =
-        Str.matched_group 2 description |> Int.of_string
-      in
-      Str.matched_group 3 description
-      |> aux
-      |> List.cons {backport_to; rejected_milestone}
-    else if String_utils.string_match ~regexp:end_regexp description then
-      let backport_to = Str.matched_group 1 description in
-      let rejected_milestone =
-        Str.matched_group 2 description |> Int.of_string
-      in
-      [{backport_to; rejected_milestone}]
-    else []
-  in
-  if String_utils.string_match ~regexp:begin_regexp description then
-    Str.matched_group 1 description |> aux
-  else []
-
 let get_pull_request_cards ~bot_info ~owner ~repo ~number =
   let open GitHub_GraphQL.PullRequest_Cards in
   makeVariables ~owner ~repo ~number ()
@@ -78,7 +48,8 @@ let get_pull_request_milestone ~bot_info ~pr_id =
             | Some milestone ->
                 Ok
                   ( milestone.description
-                  |> Option.map ~f:(extract_backport_info ~bot_info)
+                  |> Option.map ~f:(fun desc ->
+                         Utils.extract_backport_info ~bot_info ~description:desc )
                   |> Option.value ~default:[] )
             | None ->
                 Ok [] )
@@ -112,7 +83,9 @@ let get_pull_request_id_and_milestone ~bot_info ~owner ~repo ~number =
                   Ok
                     ( GitHub_ID.of_string pr.id
                     , milestone.description
-                      |> Option.map ~f:(extract_backport_info ~bot_info)
+                      |> Option.map ~f:(fun desc ->
+                             Utils.extract_backport_info ~bot_info
+                               ~description:desc )
                       |> Option.value ~default:[] ) ) ) )
 
 let get_pull_request_id ~bot_info ~owner ~repo ~number =

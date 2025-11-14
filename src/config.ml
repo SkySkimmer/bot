@@ -2,23 +2,6 @@ open Base
 open Bot_components
 open Utils
 
-let toml_of_file file_path = Toml.Parser.(from_filename file_path |> unsafe)
-
-let toml_of_string s = Toml.Parser.(from_string s |> unsafe)
-
-let find k = Toml.Types.Table.find (Toml.Types.Table.Key.of_string k)
-
-let subkey_value toml_table k k' =
-  Toml.Lenses.(get toml_table (key k |-- table |-- key k' |-- string))
-
-let list_table_keys toml_table =
-  Toml.Types.Table.fold
-    (fun k _ ks -> Toml.Types.Table.Key.to_string k :: ks)
-    toml_table []
-
-let string_of_mapping =
-  Hashtbl.fold ~init:"" ~f:(fun ~key ~data acc -> acc ^ f "(%s, %s)\n" key data)
-
 let port toml_data =
   Option.value_map
     (subkey_value toml_data "server" "port")
@@ -132,40 +115,11 @@ let github_private_key () =
   | Error (`Msg e) ->
       failwith (f "Error while decoding RSA key: %s" e)
 
-let parse_mappings mappings =
-  let assoc =
-    list_table_keys mappings
-    |> List.map ~f:(fun k ->
-           match
-             (subkey_value mappings k "github", subkey_value mappings k "gitlab")
-           with
-           | Some gh, Some gl ->
-               let gl_domain =
-                 subkey_value mappings k "gitlab_domain"
-                 |> Option.value ~default:"gitlab.com"
-               in
-               (gh, (gl_domain, gl))
-           | _, _ ->
-               failwith (f "Missing github or gitlab key for mappings.%s" k) )
-  in
-  let assoc_rev =
-    List.map assoc ~f:(fun (gh, (gl_domain, gl)) -> (gl_domain ^ "/" ^ gl, gh))
-  in
-  let get_table t =
-    match t with
-    | `Duplicate_key _ ->
-        raise (Failure "Duplicate key in config.")
-    | `Ok t ->
-        t
-  in
-  ( get_table (Hashtbl.of_alist (module String) assoc)
-  , get_table (Hashtbl.of_alist (module String) assoc_rev) )
-
 let make_mappings_table toml_data =
   try
     match find "mappings" toml_data with
     | Toml.Types.TTable a ->
-        parse_mappings a
+        GitHub_GitLab_sync.parse_mappings a
     | _ ->
         (Hashtbl.create (module String), Hashtbl.create (module String))
   with Stdlib.Not_found ->

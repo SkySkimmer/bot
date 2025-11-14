@@ -4,6 +4,10 @@
 
 val string_match : regexp:string -> ?pos:int -> string -> bool
 
+val find_regex_in_lines : regexps:string list -> string list -> string option
+
+val find_all_regex_in_lines : regexps:string list -> string list -> string list
+
 val fold_string_matches :
   regexp:string -> f:((unit -> 'a) -> 'a) -> init:'a -> ?pos:int -> string -> 'a
 
@@ -29,6 +33,10 @@ val code_wrap : string -> string
 (* HTML/Comment Processing *)
 (* ========================================================================== *)
 
+val markdown_details : string -> string -> string
+
+val markdown_link : string -> string -> string
+
 val trim_comments : string -> string
 
 (* ========================================================================== *)
@@ -36,3 +44,9 @@ val trim_comments : string -> string
 (* ========================================================================== *)
 
 val strip_quoted_bot_name : github_bot_name:string -> string -> string
+
+val clean_gitlab_trace : string -> string list
+
+val shorten_ci_check_name : string -> string
+
+val string_of_mapping : (string, string) Base.Hashtbl.t -> string
