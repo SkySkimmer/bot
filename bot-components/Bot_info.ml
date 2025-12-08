@@ -2,19 +2,23 @@ open Base
 
 type t =
   { gitlab_instances: (string, string * string) Hashtbl.t
-  ; github_pat: string
-  ; github_install_token: string option
+  ; github_pat: string option
+  ; github_install_token: string
   ; github_name: string
   ; email: string
   ; domain: string
   ; app_id: int }
 
-let github_token bot_info =
-  match bot_info.github_install_token with
-  | Some t ->
-      t
+let github_pat bot_info =
+  match bot_info.github_pat with
+  | Some pat ->
+      pat
   | None ->
-      bot_info.github_pat
+      failwith
+        "No GitHub PAT available. This operation requires a GitHub PAT. Please \
+         ensure the PAT is set in the configuration."
+
+let github_token bot_info = bot_info.github_install_token
 
 let gitlab_name_and_token bot_info gitlab_domain =
   match Hashtbl.find bot_info.gitlab_instances gitlab_domain with

@@ -54,13 +54,6 @@ let gitlab_instances toml_data =
   )
   |> Hashtbl.of_alist_exn (module String)
 
-let github_access_token toml_data =
-  match subkey_value toml_data "github" "api_token" with
-  | None ->
-      Sys.getenv_exn "GITHUB_ACCESS_TOKEN"
-  | Some secret ->
-      secret
-
 let github_webhook_secret toml_data =
   match subkey_value toml_data "github" "webhook_secret" with
   | None ->
