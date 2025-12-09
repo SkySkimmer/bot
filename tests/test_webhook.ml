@@ -1,6 +1,21 @@
 open Base
+open Stdio
 open Bot_components
 open Cohttp
+
+let with_captured_stderr f =
+  (* Temporarily redirect stderr to a temp file so we can assert on log output. *)
+  let tmp = Stdlib.Filename.temp_file "stderr" "log" in
+  let tmp_fd = Unix.(openfile tmp [O_RDWR] 0o600) in
+  let orig_stderr = Unix.dup Unix.stderr in
+  Unix.dup2 tmp_fd Unix.stderr ;
+  Unix.close tmp_fd ;
+  Exn.protect
+    ~f:(fun () -> f tmp)
+    ~finally:(fun () ->
+      Out_channel.flush Stdio.stderr ;
+      Unix.dup2 orig_stderr Unix.stderr ;
+      Unix.close orig_stderr )
 
 (* Webhook payload WITH installation.id (GitHub App mode)
    The only difference from legacy webhooks is the presence of "installation" field *)
@@ -123,32 +138,34 @@ let test_webhook_without_installation_id () =
   let headers =
     Header.init () |> fun h -> Header.add h "X-GitHub-Event" "pull_request"
   in
-  let result =
-    GitHub_subscriptions.receive_github ~secret headers
-      payload_without_installation_id
-  in
-  match result with
-  | Ok (None, _) ->
-      Alcotest.(check bool)
-        "Webhook without installation.id accepted by parser (actions will \
-         require installation)"
-        true true
-  | Ok (Some install_id, _) ->
-      Alcotest.fail
-        (Printf.sprintf "Should not have installation.id, but got: %d"
-           install_id )
-  | Error msg ->
-      Alcotest.fail
-        (Printf.sprintf
-           "Webhook parsing failed unexpectedly (valid webhook without \
-            installation.id should succeed): %s"
-           msg )
+  with_captured_stderr (fun tmp_log ->
+      let result =
+        GitHub_subscriptions.receive_github ~secret headers
+          payload_without_installation_id
+      in
+      ( match result with
+      | Ok (None, _) ->
+          ()
+      | Ok (Some install_id, _) ->
+          Alcotest.fail
+            (Printf.sprintf "Should not have installation.id, but got: %d"
+               install_id )
+      | Error msg ->
+          Alcotest.fail
+            (Printf.sprintf
+               "Webhook parsing failed unexpectedly (valid webhook without \
+                installation.id should succeed): %s"
+               msg ) ) ;
+      Out_channel.flush stderr ;
+      let logged = In_channel.read_all tmp_log in
+      Alcotest.check Alcotest.bool "logs legacy webhook" true
+        (String.is_substring ~substring:GitHub_subscriptions.legacy_webhook_log
+           logged ) )
 
 let () =
   Alcotest.run "Webhook tests"
     [ ( "webhook parsing"
       , [ ("with installation.id", `Quick, test_webhook_with_installation_id)
-        ; ( "without installation.id (legacy format accepted, actions require \
-             installation)"
+        ; ( "without installation.id (legacy webhook logs error)"
           , `Quick
           , test_webhook_without_installation_id ) ] ) ]
