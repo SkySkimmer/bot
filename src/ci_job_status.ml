@@ -19,8 +19,8 @@ type build_failure = Warn of string | Retry of string | Ignore of string
 (******************************************************************************)
 
 let send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
-    ~github_repo_full_name:_ ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~failure_reason ~external_id ~trace
+    ~gitlab_domain ~gitlab_repo_full_name ~context ~failure_reason ~external_id
+    ~trace
     ?(summary_builder = fun _ trace_description -> Lwt.return trace_description)
     ?(allow_failure_handler =
       fun ~bot_info:_ ~job_name:_ ~job_url:_ ~pr_num:_ ~head_commit:_
@@ -158,9 +158,9 @@ let trace_action ~repo_full_name trace =
      then Ignore "Docker image not found. Do not report anything specific."
      else Warn trace )
 
-let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
-    ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~failure_reason ~external_id ?summary_builder ?allow_failure_handler () =
+let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo) ~gitlab_domain
+    ~gitlab_repo_full_name ~context ~failure_reason ~external_id
+    ?summary_builder ?allow_failure_handler () =
   let build_id = job_info.build_id in
   let project_id =
     (job_info.common_info : Bot_components.GitLab_types.ci_common_info)
@@ -187,9 +187,8 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
   | Warn trace ->
       Lwt_io.printf "Actual failure.\n"
       <&> send_status_check ~bot_info job_info ~pr_num (gh_owner, gh_repo)
-            ~github_repo_full_name ~gitlab_domain ~gitlab_repo_full_name
-            ~context ~failure_reason ~external_id ~trace ?summary_builder
-            ?allow_failure_handler ()
+            ~gitlab_domain ~gitlab_repo_full_name ~context ~failure_reason
+            ~external_id ~trace ?summary_builder ?allow_failure_handler ()
   | Retry reason -> (
       Lwt_io.printlf "%s... Checking whether to retry the job." reason
       >>= fun () ->
@@ -213,9 +212,8 @@ let job_failure ~bot_info job_info ~pr_num (gh_owner, gh_repo)
   | Ignore reason ->
       Lwt_io.printl reason
 
-let job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info
-    ~github_repo_full_name:_ ~gitlab_domain ~gitlab_repo_full_name ~context
-    ~state ~external_id =
+let job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info ~gitlab_domain
+    ~gitlab_repo_full_name ~context ~state ~external_id =
   let {build_id} = job_info in
   GitHub_queries.get_status_check ~bot_info ~owner:gh_owner ~repo:gh_repo
     ~commit:job_info.common_info.head_commit ~context
@@ -228,23 +226,16 @@ let job_success_or_pending ~bot_info (gh_owner, gh_repo) job_info
       let job_url =
         f "https://%s/%s/-/jobs/%d" gitlab_domain gitlab_repo_full_name build_id
       in
-      let _state, status, conclusion, description =
+      let status, conclusion, description =
         match state with
         | "success" ->
-            ( "success"
-            , COMPLETED
+            ( COMPLETED
             , Some SUCCESS
             , "Test succeeded on GitLab CI after being retried" )
         | "created" ->
-            ( "pending"
-            , QUEUED
-            , None
-            , "Test pending on GitLab CI after being retried" )
+            (QUEUED, None, "Test pending on GitLab CI after being retried")
         | "running" ->
-            ( "pending"
-            , IN_PROGRESS
-            , None
-            , "Test running on GitLab CI after being retried" )
+            (IN_PROGRESS, None, "Test running on GitLab CI after being retried")
         | _ ->
             failwith
               (f "Error: job_success_or_pending received unknown state %s."
@@ -290,7 +281,7 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
       | Error err ->
           Lwt_io.printlf "Error in pipeline action: %s" err
       | Ok (gh_owner, gh_repo) -> (
-          let _state, status, conclusion, title, summary_top =
+          let status, conclusion, title, summary_top =
             (* Check if this repo should have full CI detection *)
             let full_ci =
               match full_ci_check_repo with
@@ -319,20 +310,17 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
             in
             match pipeline_info.state with
             | "pending" ->
-                ( "pending"
-                , QUEUED
+                ( QUEUED
                 , None
                 , f "%s is pending on GitLab CI" qualified_pipeline
                 , None )
             | "running" ->
-                ( "pending"
-                , IN_PROGRESS
+                ( IN_PROGRESS
                 , None
                 , f "%s is running on GitLab CI" qualified_pipeline
                 , None )
             | "success" ->
-                ( "success"
-                , COMPLETED
+                ( COMPLETED
                 , Some
                     ( match full_ci with
                     | Some false ->
@@ -342,8 +330,7 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                 , f "%s completed successfully on GitLab CI" qualified_pipeline
                 , None )
             | "failed" ->
-                ( "failure"
-                , COMPLETED
+                ( COMPLETED
                 , Some FAILURE
                 , f "%s completed with errors on GitLab CI" qualified_pipeline
                 , Some
@@ -351,17 +338,12 @@ let pipeline_action ~bot_info ({common_info= {http_repo_url}} as pipeline_info)
                      so directly in the GitHub interface using the \"Re-run\" \
                      button.*" )
             | "cancelled" | "canceled" ->
-                ( "error"
-                , COMPLETED
+                ( COMPLETED
                 , Some CANCELLED
                 , f "%s was cancelled on GitLab CI" qualified_pipeline
                 , None )
             | s ->
-                ( "error"
-                , COMPLETED
-                , Some FAILURE
-                , "Unknown pipeline status: " ^ s
-                , None )
+                (COMPLETED, Some FAILURE, "Unknown pipeline status: " ^ s, None)
           in
           GitHub_queries.get_repository_id ~bot_info ~owner:gh_owner
             ~repo:gh_repo

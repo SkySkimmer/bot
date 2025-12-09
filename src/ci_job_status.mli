@@ -6,7 +6,6 @@ val send_status_check :
      Bot_components.GitLab_types.job_info
   -> pr_num:int option
   -> string * string
-  -> github_repo_full_name:string
   -> gitlab_domain:string
   -> gitlab_repo_full_name:string
   -> context:string
@@ -34,7 +33,6 @@ val job_failure :
      Bot_components.GitLab_types.job_info
   -> pr_num:int option
   -> string * string
-  -> github_repo_full_name:string
   -> gitlab_domain:string
   -> gitlab_repo_full_name:string
   -> context:string
@@ -58,7 +56,6 @@ val job_success_or_pending :
   -> string * string
   -> Bot_components.GitLab_types.ci_common_info
      Bot_components.GitLab_types.job_info
-  -> github_repo_full_name:string
   -> gitlab_domain:string
   -> gitlab_repo_full_name:string
   -> context:string
