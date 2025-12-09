@@ -20,6 +20,7 @@ let github_pat toml_data =
       Some token
   | None ->
       Sys.getenv "GITHUB_ACCESS_TOKEN"
+      |> Option.bind ~f:(fun s -> if String.is_empty s then None else Some s)
 
 let gitlab_instances toml_data =
   ( try
