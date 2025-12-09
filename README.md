@@ -196,21 +196,6 @@ you are interested in hearing about it.
 
 ## How to use the **@coqbot** instance ##
 
-### As a GitHub App
-
-This is the recommended installation method, as this is both easier to
-set up and it gives access to new features (related to GitHub Checks).
-
-Notes:
-
-- Installation as a GitHub App is still in an experimental stage
-and you may frequently receive requests to expand permissions.
-
-- The bot requires GitHub App installation and uses the installation
-token for all standard operations. A GitHub Personal Access Token (PAT)
-is optional and only needed for the Rocq minimization flows that must act
-as the `coqbot` user rather than the GitHub App.
-
 The bot can be installed as a GitHub App to either your account or
 organization ([link to app](https://github.com/apps/coqbot-app)).
 Once you finish the installation, follow these steps:
@@ -329,6 +314,9 @@ these are configured in your Heroku app:
 - `GITHUB_APP_ID` (can also be defined in the configuration file as `github.app_id`)
 - `GITHUB_PRIVATE_KEY` (a private key of your GitHub app)
 - `PORT` (can also be defined in the configuration file as `server.port`)
+- (optional) `GITHUB_ACCESS_TOKEN` / `github.api_token` in config: only needed
+  for Rocq minimization flows that must act as the `coqbot` user rather than
+  the GitHub App
 
 Then, you must configure the bot with a configuration file. Here is an example
 to adapt to your needs [`example-config.toml`](example-config.toml).
