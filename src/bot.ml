@@ -22,7 +22,7 @@ let app_id = Config.github_app_id toml_data
 
 let bot_info : Bot_components.Bot_info.t =
   { github_install_token= ""
-  ; github_pat= None
+  ; github_pat= Config.github_pat toml_data
   ; gitlab_instances= Config.gitlab_instances toml_data
   ; github_name= github_bot_name
   ; email= Config.bot_email toml_data

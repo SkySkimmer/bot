@@ -14,6 +14,13 @@ let github_bot_name toml_data =
     (subkey_value toml_data "bot" "name")
     ~f:String.of_string ~default:"coqbot"
 
+let github_pat toml_data =
+  match subkey_value toml_data "github" "api_token" with
+  | Some token ->
+      Some token
+  | None ->
+      Sys.getenv "GITHUB_ACCESS_TOKEN"
+
 let gitlab_instances toml_data =
   ( try
       match find "gitlab" toml_data with
