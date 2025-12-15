@@ -235,6 +235,10 @@ let github_event ~event json =
   | _ ->
       Ok (UnsupportedEvent (f "Unsupported GitHub event %s." event))
 
+let legacy_webhook_log =
+  "Error: received GitHub webhook without installation.id (legacy installation \
+   method)"
+
 let receive_github ~secret headers body =
   let open Result.Monad_infix in
   match Header.get headers "X-GitHub-Event" with
@@ -258,6 +262,11 @@ let receive_github ~secret headers body =
               Error "Webhook comes from a GitHub App, but it is not signed."
         with Yojson.Json_error _ | Type_error _ -> Ok None )
       >>= fun install_id ->
+      ( match install_id with
+      | None ->
+          Stdio.eprintf "%s\n" legacy_webhook_log
+      | Some _ ->
+          () ) ;
       github_event ~event json |> Result.map ~f:(fun r -> (install_id, r))
     with
     | Yojson.Json_error err ->

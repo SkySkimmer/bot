@@ -16,6 +16,8 @@ type msg =
   | PushEvent of push_info
   | UnsupportedEvent of string
 
+val legacy_webhook_log : string
+
 val receive_github :
      secret:string
   -> Cohttp.Header.t

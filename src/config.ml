@@ -14,6 +14,14 @@ let github_bot_name toml_data =
     (subkey_value toml_data "bot" "name")
     ~f:String.of_string ~default:"coqbot"
 
+let github_pat toml_data =
+  match subkey_value toml_data "github" "api_token" with
+  | Some token ->
+      Some token
+  | None ->
+      Sys.getenv "GITHUB_ACCESS_TOKEN"
+      |> Option.bind ~f:(fun s -> if String.is_empty s then None else Some s)
+
 let gitlab_instances toml_data =
   ( try
       match find "gitlab" toml_data with
@@ -53,13 +61,6 @@ let gitlab_instances toml_data =
         , (github_bot_name toml_data, Sys.getenv_exn "GITLAB_ACCESS_TOKEN") ) ]
   )
   |> Hashtbl.of_alist_exn (module String)
-
-let github_access_token toml_data =
-  match subkey_value toml_data "github" "api_token" with
-  | None ->
-      Sys.getenv_exn "GITHUB_ACCESS_TOKEN"
-  | Some secret ->
-      secret
 
 let github_webhook_secret toml_data =
   match subkey_value toml_data "github" "webhook_secret" with

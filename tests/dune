@@ -1,0 +1,29 @@
+(env
+ (dev
+  (flags :standard -w -9)))
+
+(library
+ (name test_helpers)
+ (modules test_helpers)
+ (wrapped false)
+ (libraries bot-components base))
+
+(test
+ (name test_bot_info)
+ (modules test_bot_info)
+ (libraries alcotest bot-components botlib base test_helpers))
+
+(test
+ (name test_webhook)
+ (modules test_webhook)
+ (libraries alcotest bot-components botlib base cohttp))
+
+(test
+ (name test_config)
+ (modules test_config)
+ (libraries alcotest bot-components botlib base unix test_helpers))
+
+(test
+ (name test_pat_usage)
+ (modules test_pat_usage)
+ (libraries alcotest bot-components botlib base test_helpers))

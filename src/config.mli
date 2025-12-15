@@ -13,7 +13,7 @@ val bot_email : Toml.Types.table -> string
 
 val github_bot_name : Toml.Types.table -> string
 
-val github_access_token : Toml.Types.table -> string
+val github_pat : Toml.Types.table -> string option
 
 val github_app_id : Toml.Types.table -> int
 
