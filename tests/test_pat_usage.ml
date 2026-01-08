@@ -5,7 +5,7 @@ let test_coq_bug_minimizer_requires_pat () =
   let bot_info = create_bot_info () in
   match
     Result.try_with (fun () ->
-        Coq_utils.git_coq_bug_minimizer ~bot_info ~script:"script"
+        Coq.git_coq_bug_minimizer ~bot_info ~script:"script"
           ~comment_thread_id:(Bot_components.GitHub_ID.of_string "1")
           ~comment_author:"author" ~owner:"owner" ~repo:"repo" ~coq_version:"v"
           ~ocaml_version:"v" ~minimizer_extra_arguments:[] )
@@ -19,7 +19,7 @@ let test_run_ci_minimization_requires_pat () =
   let bot_info = create_bot_info () in
   match
     Result.try_with (fun () ->
-        Coq_utils.git_run_ci_minimization ~bot_info
+        Coq.git_run_ci_minimization ~bot_info
           ~comment_thread_id:(Bot_components.GitHub_ID.of_string "1")
           ~owner:"owner" ~repo:"repo" ~pr_number:"1" ~docker_image:"img"
           ~target:"target" ~ci_targets:[] ~opam_switch:"sw" ~failing_urls:""
