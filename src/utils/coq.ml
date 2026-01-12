@@ -1,7 +1,7 @@
 open Base
-open Bot_components
-open Bot_components.Bot_info
+open Bot_info
 open Git_utils
+open Bot_components
 
 let git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
     ~owner ~repo ~coq_version ~ocaml_version ~minimizer_extra_arguments =
@@ -11,7 +11,7 @@ let git_coq_bug_minimizer ~bot_info ~script ~comment_thread_id ~comment_author
   let github_pat = Bot_info.github_pat bot_info in
   Stdlib.Filename.quote_command "./coq_bug_minimizer.sh"
     [ script
-    ; GitHub_ID.to_string comment_thread_id
+    ; Bot_components.GitHub_ID.to_string comment_thread_id
     ; comment_author
     ; github_pat
     ; bot_info.github_name
@@ -30,7 +30,7 @@ let git_run_ci_minimization ~bot_info ~comment_thread_id ~owner ~repo ~pr_number
      user, who is a collaborator on the run-coq-bug-minimizer repo,
      not coqbot the GitHub App *)
   let github_pat = Bot_info.github_pat bot_info in
-  ( [ GitHub_ID.to_string comment_thread_id
+  ( [ Bot_components.GitHub_ID.to_string comment_thread_id
     ; github_pat
     ; bot_info.github_name
     ; bot_info.domain

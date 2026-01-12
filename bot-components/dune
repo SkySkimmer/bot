@@ -1,50 +1,29 @@
+(include_subdirs unqualified)
+
 (library
  (name Bot_components)
  (public_name bot-components)
+ (wrapped false)
+ (modules_without_implementation GitHub_types GitLab_types)
  (libraries base camlzip cohttp-lwt-unix eqaf ohex mirage-crypto stdio str
    x509 yojson ISO8601 digestif toml)
- (private_modules GraphQL_query GitHub_GraphQL)
- (modules_without_implementation GitHub_types GitLab_types)
  (inline_tests)
  (preprocess
   (per_module
-   ((pps graphql_ppx -- -native -schema bot-components/github-schema.json)
+   ((pps graphql_ppx -- -native -schema
+      bot-components/github/github-schema.json)
     GitHub_GraphQL)
-   ((pps graphql_ppx -- -native -schema bot-components/gitlab-schema.json)
+   ((pps graphql_ppx -- -native -schema
+      bot-components/gitlab/gitlab-schema.json)
     GitLab_GraphQL)
    ((pps ppx_expect)
     String_utils
     Git_utils)))
  (preprocessor_deps
-  (file github-schema.json)
-  (file gitlab-schema.json)))
+  (file github/github-schema.json)
+  (file gitlab/gitlab-schema.json)))
 
-(rule
- (targets gitlab-schema.json)
- (deps (universe))
- (action
-  (with-stdout-to
-   %{targets}
-   (run get-graphql-schema https://gitlab.com/api/graphql --json)))
- (mode promote))
-
-; This rule needs access to the user's Private Access Token for github
-; (see: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-; The token should be stored in .github-token in the same directory as this dune file
-; A schema.json file will be created containing the graphql schema for github
-;
-; `read-strings` is preferred to read since it won't read the newline
-
-(rule
- (targets github-schema.json)
- (deps .github-token (universe))
- (action
-  (with-stdout-to
-   %{targets}
-   (run get-graphql-schema --json --header
-     "Authorization=Bearer %{read-strings:.github-token}"
-     https://api.github.com/graphql)))
- (mode promote))
+; Schema generation rules are now in github/dune and gitlab/dune
 
 (env
  (dev

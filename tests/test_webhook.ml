@@ -1,6 +1,5 @@
 open Base
 open Stdio
-open Bot_components
 open Cohttp
 
 let with_captured_stderr f =

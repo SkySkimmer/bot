@@ -1,5 +1,3 @@
-open Bot_components
-
 val git_coq_bug_minimizer :
      bot_info:Bot_info.t
   -> script:string
