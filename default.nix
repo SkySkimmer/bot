@@ -1,6 +1,6 @@
 { pkgs ? import (fetchTarball {
-  url = "https://github.com/NixOS/nixpkgs/archive/5ea573ca476915e0ccefb99be5687e4150fa049b.tar.gz";
-  sha256 = "0hsg6xjj4iclfrvplsf0rd9xiwkaazvmlp609qiwka65v7wcjja2";
+  url = "https://github.com/NixOS/nixpkgs/archive/61db79b0c6b838d9894923920b612048e1201926.tar.gz";
+  sha256 = "sha256-h5bRFy9bco+8QcK7rGoOiqMxMbmn21moTACofNLRMP4=";
 }) { } }:
 
 pkgs.stdenv.mkDerivation rec {
@@ -15,7 +15,7 @@ pkgs.stdenv.mkDerivation rec {
     merlin
     ocaml-lsp
     pkgs.ocamlformat
-    pkgs.nixfmt-rfc-style
+    pkgs.nixfmt
     pkgs.nodePackages.get-graphql-schema
     # Direct dependencies
     base
@@ -25,7 +25,7 @@ pkgs.stdenv.mkDerivation rec {
     ohex
     iso8601
     mirage-crypto
-    mirage-crypto-rng-lwt
+    mirage-crypto-rng
     yojson
     graphql_ppx
     toml
@@ -34,6 +34,7 @@ pkgs.stdenv.mkDerivation rec {
     digestif
     ppx_expect
     odoc
+    alcotest
   ];
 
   shellHook = ''

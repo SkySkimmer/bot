@@ -16,7 +16,7 @@ depends: [
   "ssl" {>= "0.5.9"}
   "stdio" {>= "v0.14.0"}
   "ohex" {>= "0.2.0"}
-  "mirage-crypto" {>= "1.0.0"}
+  "mirage-crypto" {>= "2.0.0"}
   "eqaf" {>= "0.7"}
   "yojson" {>= "1.7.0"}
   "graphql_ppx" {>= "1.2.0"}

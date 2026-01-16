@@ -5,8 +5,8 @@
  (modules bot)
  (promote (until-clean))
  (libraries base bot-components cohttp-lwt-unix mirage-crypto
-   mirage-crypto-rng mirage-crypto-rng-lwt stdio toml yojson coq-bot.config
-   coq-bot.webhooks coq-bot.actions coq-bot.ci coq-bot.utils))
+   mirage-crypto-rng.unix stdio toml yojson coq-bot.config coq-bot.webhooks
+   coq-bot.actions coq-bot.ci coq-bot.utils))
 
 (env
  (dev
