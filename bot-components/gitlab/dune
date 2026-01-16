@@ -1,0 +1,8 @@
+(rule
+ (targets gitlab-schema.json)
+ (deps (universe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run get-graphql-schema https://gitlab.com/api/graphql --json)))
+ (mode promote))

@@ -1,0 +1,10 @@
+(rule
+ (targets github-schema.json)
+ (deps ../.github-token (universe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run get-graphql-schema --json --header
+     "Authorization=Bearer %{read-strings:../.github-token}"
+     https://api.github.com/graphql)))
+ (mode promote))

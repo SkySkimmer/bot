@@ -1,5 +1,4 @@
 open Base
-open Bot_components
 
 let create_bot_info ?(github_install_token = "") ?(github_pat = None)
     ?(github_name = "testbot") ?(email = "test@example.com")

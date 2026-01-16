@@ -8,4 +8,4 @@ val send_graphql_query :
   -> query:string
   -> parse:(Yojson.Basic.t -> 'a)
   -> Yojson.Basic.t
-  -> ('a, string) result Lwt.t
+  -> ('a, string) Lwt_result.t

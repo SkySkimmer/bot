@@ -1,4 +1,3 @@
-open Bot_components
 open Base
 open Test_helpers
 

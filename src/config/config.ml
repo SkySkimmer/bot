@@ -1,5 +1,4 @@
 open Base
-open Bot_components
 open Utils
 
 let port toml_data =
