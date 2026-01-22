@@ -177,7 +177,7 @@ let run_ci_action ~bot_info ~comment_info ?full_ci ~gitlab_mapping
              let* () = Lwt_io.printl "Authorized user: pushing to GitLab." in
              match comment_info.pull_request with
              | Some pr_info ->
-                 update_pr ~skip_author_check:true pr_info ~bot_info
+                 update_pr ?full_ci ~skip_author_check:true pr_info ~bot_info
                    ~gitlab_mapping ~github_mapping
              | None ->
                  let {owner; repo; number} = comment_info.issue.issue in
